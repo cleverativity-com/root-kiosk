@@ -3,4 +3,8 @@ raspios.img.xz
 root-kiosk-*.img
 root-kiosk-*.img.xz
 work/
+third_party/
 .DS_Store
+
+__pycache__/
+*.pyc

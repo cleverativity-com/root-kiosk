@@ -20,6 +20,26 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
+      - name: Fetch TBW kiosk app and API sources
+        env:
+          ACCLEVERATE_READ_TOKEN: ${{ secrets.ACCLEVERATE_READ_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ACCLEVERATE_READ_TOKEN}" ]; then
+            echo "ACCLEVERATE_READ_TOKEN is unset."
+            echo "The image will download the published kiosk UI and use the bundled local API."
+            exit 0
+          fi
+          rm -rf third_party/accleverate-v26
+          git -c "http.extraheader=AUTHORIZATION: bearer ${ACCLEVERATE_READ_TOKEN}" \
+            clone --depth 1 --filter=blob:none --sparse \
+            https://github.com/cleverativity-com/accleverate-v26.git \
+            third_party/accleverate-v26
+          git -C third_party/accleverate-v26 sparse-checkout set \
+            apps/tbw-root-kiosk-app \
+            services/tbw-root-api
+          git -C third_party/accleverate-v26 remote remove origin || true
+
       - name: Install dependencies
         run: |
           sudo apt update -qq

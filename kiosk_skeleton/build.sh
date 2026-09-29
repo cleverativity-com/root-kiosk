@@ -5,7 +5,7 @@ set -x -e
 apt update
 
 APT_LISTCHANGES_FRONTEND=none DEBIAN_FRONTEND=noninteractive apt dist-upgrade -y --option=Dpkg::Options::=--force-confdef
-DEBIAN_FRONTEND=noninteractive apt install -y wget curl fonts-noto-color-emoji lightdm openbox nginx php-fpm php-cli chromium autossh unclutter x11-xserver-utils x11-xkb-utils xdotool htop nano openssh-server rsync x11vnc lm-sensors ntpsec-ntpdate scrot wireless-regdb fontconfig console-data ifupdown iproute2 wpasupplicant iw wireless-tools haveged rfkill fbi feh openvpn nftables onboard at-spi2-core dbus-x11 dconf-cli dconf-gsettings-backend
+DEBIAN_FRONTEND=noninteractive apt install -y wget curl ca-certificates fonts-noto-color-emoji lightdm openbox nginx php-fpm php-cli chromium autossh unclutter x11-xserver-utils x11-xkb-utils xdotool htop nano openssh-server rsync x11vnc lm-sensors ntpsec-ntpdate scrot wireless-regdb fontconfig console-data ifupdown iproute2 wpasupplicant iw wireless-tools haveged rfkill fbi feh openvpn nftables onboard at-spi2-core dbus-x11 dconf-cli dconf-gsettings-backend python3 python3-venv python3-fastapi python3-uvicorn python3-pydantic
 
 rsync -a --chown=root:root "/kiosk_skeleton/." "/"
 
@@ -121,11 +121,15 @@ systemctl disable openvpn-client@.service || true
 systemctl enable ntpdate
 systemctl enable lightdm
 systemctl enable nginx
+systemctl enable tbw-root-api
 systemctl enable ssh
 
 # Raspberry Pi specific GPU-related services (generate Xorg config)
 systemctl enable glamor-test || true
 systemctl enable rp1-test || true
+
+# Kiosk UI into nginx, hardware API user and state tmpfs.
+/usr/lib/tbw/install-tbw.sh
 
 # generate a version info/build info file
 echo -n "Chromium version: " >> /version-info

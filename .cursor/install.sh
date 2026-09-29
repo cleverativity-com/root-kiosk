@@ -51,6 +51,8 @@ sudo apt-get install "${APT_OPTS[@]}" \
   shellcheck \
   nginx \
   php-fpm \
-  php-cli
+  php-cli \
+  python3-venv \
+  python3-pip
 
 echo "root-kiosk Cloud Agent environment ready."

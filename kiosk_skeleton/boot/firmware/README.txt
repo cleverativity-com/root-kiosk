@@ -5,6 +5,7 @@ After flashing, this FAT32 partition can be edited from any computer.
 
 kioskbrowser.ini
   Homepage, WiFi, keyboard layout, VNC, timezone.
+  The default homepage is the on-device kiosk UI (http://127.0.0.1/).
 
 splash.png
   Boot / Openbox splash screen.

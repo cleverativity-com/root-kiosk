@@ -4,16 +4,51 @@ server {
 
         root /var/www/html;
 
-        index index.php;
+        index index.html index.php;
 
         server_name _;
 
-        location / {
+        # Local hardware API used by the kiosk UI (tbw-root-api on localhost).
+        location = /health {
+                proxy_pass http://127.0.0.1:8765/health;
+                proxy_set_header Host $host;
+        }
+
+        location /api/ {
+                proxy_pass http://127.0.0.1:8765;
+                proxy_http_version 1.1;
+                proxy_set_header Host $host;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_read_timeout 120s;
+        }
+
+        location /www-public/ {
+                index index.php index.html;
                 try_files $uri $uri/ =404;
         }
 
+        location ~ ^/www-public/.*\.php$ {
+                include snippets/fastcgi-php.conf;
+                fastcgi_pass unix:/run/php-fpm.sock;
+        }
+
+        location = /heartbeat.php {
+                include snippets/fastcgi-php.conf;
+                fastcgi_pass unix:/run/php-fpm.sock;
+        }
+
+        location = /screenshot.php {
+                include snippets/fastcgi-php.conf;
+                fastcgi_pass unix:/run/php-fpm.sock;
+        }
+
         location ~ \.php$ {
-               include snippets/fastcgi-php.conf;
-               fastcgi_pass unix:/run/php-fpm.sock;
+                include snippets/fastcgi-php.conf;
+                fastcgi_pass unix:/run/php-fpm.sock;
+        }
+
+        # Kiosk single-page app (apps/tbw-root-kiosk-app).
+        location / {
+                try_files $uri $uri/ /index.html;
         }
 }

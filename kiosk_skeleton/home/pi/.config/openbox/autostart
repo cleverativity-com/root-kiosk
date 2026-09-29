@@ -105,15 +105,15 @@ else
     CHROME_CACHE_FLAGS=""
 fi
 
-# The homepage and remote admin live on the VPN. Wait for tun0 so
-# Chromium does not load an error page before the tunnel is up.
-VPN_WAIT=0
-while [ "${VPN_WAIT}" -lt 120 ]; do
-	if ip -o link show tun0 >/dev/null 2>&1; then
+# The kiosk UI and hardware API are on this machine. Wait until nginx
+# can reach tbw-root-api before Chromium opens the page.
+HEALTH_WAIT=0
+while [ "${HEALTH_WAIT}" -lt 60 ]; do
+	if curl -fsS "http://127.0.0.1/health" >/dev/null 2>&1; then
 		break
 	fi
 	sleep 1
-	VPN_WAIT=$((VPN_WAIT + 1))
+	HEALTH_WAIT=$((HEALTH_WAIT + 1))
 done
 
 # start chromium

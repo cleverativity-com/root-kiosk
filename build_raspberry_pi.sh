@@ -66,6 +66,12 @@ sudo mount /dev/loop0p1 "${BUILD_DIR}/boot/firmware"
 sudo rsync -a "${SCRIPT_DIR}/raspberry_pi_skeleton/." "${BUILD_DIR}" || true
 sudo rsync -a "${SCRIPT_DIR}/kiosk_skeleton/." "${BUILD_DIR}/kiosk_skeleton" || true
 
+# Optional accleverate checkout (apps/tbw-root-kiosk-app and services/tbw-root-api).
+if [ -d "${SCRIPT_DIR}/third_party/accleverate-v26" ]; then
+	sudo mkdir -p "${BUILD_DIR}/opt/src"
+	sudo rsync -a "${SCRIPT_DIR}/third_party/accleverate-v26" "${BUILD_DIR}/opt/src/accleverate-v26"
+fi
+
 # Use correct architecture specific (arm64/armhf) config.txt
 sudo rm "${BUILD_DIR}/boot/firmware/config.txt"
 sudo mv "${BUILD_DIR}/boot/firmware/config-${IMAGE_SUFFIX}.txt" "${BUILD_DIR}/boot/firmware/config.txt"

@@ -5,7 +5,8 @@ This repository builds a **Cleverativity kiosk image** (root-kiosk).
 
 Defaults baked into `/boot/firmware`:
 
-- Homepage: `https://a26-tbw-root-app-main.srvnve01.cleverativity.com/`
+- Homepage: the on-device TBW kiosk UI at `http://127.0.0.1/`
+- Hardware API: `tbw-root-api` on `127.0.0.1:8765`, reached by the UI through nginx at `/api/v1`
 - Splash screen: Cleverativity logo (`splash.png`)
 - Keyboard layout: Italian (`it`) plus an on-screen keyboard (onboard)
 - Screen never blanks
@@ -146,6 +147,16 @@ setInterval(function() {
 ```
 
 Whenever the heartbeat stops (for whatever reason), the device will first restart the X11 environment (browser, window manager, etc.) and later (if it hasn't recovered) the whole system by rebooting.
+
+## TBW kiosk app and API
+
+Chromium opens the TBW kiosk UI (`apps/tbw-root-kiosk-app`) from nginx on this machine. nginx serves that UI from `/var/www/html` and proxies `/api/` plus `/health` to the `tbw-root-api` systemd service, which listens on `127.0.0.1:8765` only.
+
+The image build downloads the published UI from `https://a26-tbw-root-kiosk-app-main.srvnve01.cleverativity.com/`. To install the copies from [accleverate-v26](https://github.com/cleverativity-com/accleverate-v26) instead, set the GitHub Actions secret `ACCLEVERATE_READ_TOKEN` (read access to that repository). The workflow sparse-checkouts `apps/tbw-root-kiosk-app` and `services/tbw-root-api` into `third_party/accleverate-v26`, and `build.sh` installs them.
+
+Without that checkout, the image runs the bundled API in `kiosk_skeleton/opt/tbw-root-api`. It implements the same `/api/v1` contract the kiosk UI calls and simulates the dispenser. It does not drive GPIO; the upstream service owns the pin map.
+
+Heartbeat and screenshot PHP endpoints stay on nginx next to the kiosk UI.
 
 ## Local webserver
 root-kiosk ships with an nginx webserver and a PHP runtime by default (which is used internally for the heartbeat mechanism).  
