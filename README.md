@@ -50,9 +50,9 @@ Other similar projects:
 ## Key features
 - [Images built via CI](https://github.com/cleverativity/root-kiosk/blob/main/.github/workflows/main.yml) and published to [Releases](https://github.com/cleverativity/root-kiosk/releases) on every push to `main`
 - WiFi & Ethernet connection support
-- Raspberry Pi & PC (64-bit) compatibility
+- Raspberry Pi 5 (64-bit)
 - [USB flash drive, USB SSD, etc. compatible](#how-to--installation-guide)
-- aarch64 images for Raspberry Pis (_significant_ performance improvements over armv7/32bit ARM)
+- aarch64 image for Raspberry Pi 5
 - Read-only filesystem (no more broken SD cards)
 - Browser cache can be cleared at configurable intervals
 - [HTTP watchdog (website needs to send heartbeat messages via XHR/AJAX to localhost)](#http-watchdog-functionality)
@@ -70,11 +70,7 @@ Other similar projects:
 - [Local webserver with PHP support](#local-webserver) (can host simple HTML, landing pages, slideshows, iFrame mechanisms, etc.)
 
 ## Supported platforms
-- Raspberry Pi 3, 4, 5, Zero 2 (W): use `root-kiosk-*-arm64-raspberrypi.img.xz`
-- PCs with UEFI (Intel, AMD or Nvidia GPUs): use `x86.img.xz`
-
-**not recommended, but working**
-- Raspberry Pi 1, 2, Zero (W) (very slow, 32bit only, try to avoid): use `root-kiosk-*-armhf-raspberrypi.img.xz`
+- Raspberry Pi 5: use `root-kiosk-*-arm64-raspberrypi.img.xz`
 
 ## Application examples
 - Digital signage
@@ -109,9 +105,6 @@ Other similar projects:
 > [!IMPORTANT]  
 > root-kiosk does not have an installer for x86 PCs. On PCs, you'll need to write the image to the storage somehow.
 > Either write the storage media (like NVMe or SATA storage) externally using another PC or boot a Linux Live-ISO and use dd to flash the image.
-
-> [!WARNING]  
-> Don't use the `armhf` images on Raspberry Pi 3 or newer (or the Zero 2 (W)). It will work, but performance will be impacted severely.
 
 Just like any other Raspberry Pi image:   
 Download the current .img.xz file from the [Releases](https://github.com/cleverativity/root-kiosk/releases) page and flash it to a storage device of your choice.  

@@ -72,7 +72,7 @@ if [ -d "${SCRIPT_DIR}/third_party/accleverate-v26" ]; then
 	sudo rsync -a "${SCRIPT_DIR}/third_party/accleverate-v26" "${BUILD_DIR}/opt/src/accleverate-v26"
 fi
 
-# Use correct architecture specific (arm64/armhf) config.txt
+# Use the Raspberry Pi 5 (arm64) config.txt
 sudo rm "${BUILD_DIR}/boot/firmware/config.txt"
 sudo mv "${BUILD_DIR}/boot/firmware/config-${IMAGE_SUFFIX}.txt" "${BUILD_DIR}/boot/firmware/config.txt"
 

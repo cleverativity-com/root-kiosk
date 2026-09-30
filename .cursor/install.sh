@@ -4,8 +4,9 @@
 #
 # root-kiosk is a Debian-based kiosk OS image builder. The images are produced
 # by ./build_raspberry_pi.sh, which downloads a Raspberry Pi OS image, expands it
-# on a loop device, chroots into the (arm64/armhf) root filesystem via
+# on a loop device, chroots into the arm64 root filesystem via
 # qemu-user-static binfmt emulation and installs the kiosk skeleton.
+# The image target is Raspberry Pi 5 (arm64).
 #
 # This script installs, idempotently and non-interactively:
 #   1. The image-build toolchain used by the CI workflow (.github/workflows/main.yml).
