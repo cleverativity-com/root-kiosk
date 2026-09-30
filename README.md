@@ -149,6 +149,8 @@ The image build downloads the published UI from `https://a26-tbw-root-kiosk-app-
 
 Without that checkout, the image runs the bundled API in `kiosk_skeleton/opt/tbw-root-api`. It implements the same `/api/v1` contract the kiosk UI calls and simulates the dispenser. It does not drive GPIO; the upstream service owns the pin map.
 
+At boot, and again whenever the USB printer appears, the image runs `chmod 666 /dev/usb/lp0` so the API can open the label printer.
+
 Heartbeat and screenshot PHP endpoints stay on nginx next to the kiosk UI.
 
 ## Local webserver

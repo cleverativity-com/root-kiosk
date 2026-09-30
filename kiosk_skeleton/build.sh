@@ -121,6 +121,7 @@ systemctl disable openvpn-client@.service || true
 systemctl enable ntpdate
 systemctl enable lightdm
 systemctl enable nginx
+systemctl enable kiosk-printer
 systemctl enable tbw-root-api
 systemctl enable ssh
 

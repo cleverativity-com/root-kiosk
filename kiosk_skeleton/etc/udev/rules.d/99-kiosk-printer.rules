@@ -1,0 +1,3 @@
+# usblp creates /dev/usb/lp0 as root-only. Re-apply mode 666 whenever it appears,
+# including boot and later replug, so tbw-root-api can open the printer.
+ACTION=="add", KERNEL=="lp0", ENV{DEVNAME}=="/dev/usb/lp0", MODE="0666", RUN+="/usr/bin/kiosk-printer --now"

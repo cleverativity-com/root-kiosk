@@ -1,6 +1,6 @@
 [Unit]
 Description=TBW Root local hardware API
-After=network.target
+After=network.target kiosk-printer.service
 Before=lightdm.service
 
 [Service]
