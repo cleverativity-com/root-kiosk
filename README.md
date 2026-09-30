@@ -7,7 +7,7 @@ Defaults baked into `/boot/firmware`:
 
 - Homepage: the on-device TBW kiosk UI at `http://127.0.0.1/`
 - Hardware API: `tbw-root-api` on `127.0.0.1:8765`, reached by the UI through nginx at `/api/v1`
-- Splash screen: Cleverativity logo (`splash.png`)
+- Splash screen: Root SNC logo (`splash.png`)
 - Keyboard layout: Italian (`it`) plus an on-screen keyboard (onboard)
 - Screen never blanks
 - WiFi: `CleverWiFi` and `CleverWiFiX`

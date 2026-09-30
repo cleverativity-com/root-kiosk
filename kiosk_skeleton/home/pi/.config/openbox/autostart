@@ -2,7 +2,7 @@
 
 # display splash screen as Openbox background
 if [ -f /boot/firmware/splash.png ]; then
-   feh --bg-center /boot/firmware/splash.png
+   feh --bg-max /boot/firmware/splash.png
 fi
 
 VNC_ENABLED=$(get-ini /boot/firmware/kioskbrowser.ini vnc enabled)
