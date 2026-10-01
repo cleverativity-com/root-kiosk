@@ -1,0 +1,4 @@
+# Let the tbw-root-api service (group gpio) pulse the dispenser steppers.
+KERNEL=="gpiomem", GROUP="gpio", MODE="0660"
+KERNEL=="gpiochip*", GROUP="gpio", MODE="0660"
+SUBSYSTEM=="gpio", GROUP="gpio", MODE="0660"
