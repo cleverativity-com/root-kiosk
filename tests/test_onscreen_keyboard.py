@@ -60,7 +60,11 @@ class OnscreenKeyboardConfigTests(unittest.TestCase):
         override = OVERRIDE.read_text(encoding="utf-8")
         self.assertIn("[org.gnome.desktop.interface]", override)
         self.assertIn("toolkit-accessibility=true", override)
-        self.assertIn("glib-compile-schemas", BUILD.read_text(encoding="utf-8"))
+        build = BUILD.read_text(encoding="utf-8")
+        # Raspberry Pi OS lite does not ship the schema compiler.
+        self.assertIn("libglib2.0-bin", build)
+        self.assertIn("glib-compile-schemas", build)
+        self.assertLess(build.index("libglib2.0-bin"), build.index("glib-compile-schemas"))
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ set -x -e
 apt update
 
 APT_LISTCHANGES_FRONTEND=none DEBIAN_FRONTEND=noninteractive apt dist-upgrade -y --option=Dpkg::Options::=--force-confdef
-DEBIAN_FRONTEND=noninteractive apt install -y wget curl ca-certificates fonts-noto-color-emoji lightdm openbox nginx php-fpm php-cli chromium autossh unclutter x11-xserver-utils x11-xkb-utils xdotool htop nano openssh-server rsync x11vnc lm-sensors ntpsec-ntpdate scrot wireless-regdb fontconfig console-data ifupdown iproute2 wpasupplicant iw wireless-tools haveged rfkill fbi feh openvpn nftables onboard at-spi2-core dbus-x11 dconf-cli dconf-gsettings-backend python3 python3-venv python3-fastapi python3-uvicorn python3-pydantic
+DEBIAN_FRONTEND=noninteractive apt install -y wget curl ca-certificates fonts-noto-color-emoji lightdm openbox nginx php-fpm php-cli chromium autossh unclutter x11-xserver-utils x11-xkb-utils xdotool htop nano openssh-server rsync x11vnc lm-sensors ntpsec-ntpdate scrot wireless-regdb fontconfig console-data ifupdown iproute2 wpasupplicant iw wireless-tools haveged rfkill fbi feh openvpn nftables onboard at-spi2-core dbus-x11 dconf-cli dconf-gsettings-backend libglib2.0-bin python3 python3-venv python3-fastapi python3-uvicorn python3-pydantic
 
 rsync -a --chown=root:root "/kiosk_skeleton/." "/"
 
