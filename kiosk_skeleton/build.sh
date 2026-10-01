@@ -62,6 +62,11 @@ echo "tmpfs		/home/pi/.pki/ tmpfs mode=0755,nosuid,nodev,uid=1000,gid=1000  0   
 echo "tmpfs		/home/pi/.ssh/ tmpfs mode=0700,nosuid,nodev,uid=1000,gid=1000  0       0" >> /etc/fstab
 echo "tmpfs		/root/.ssh/ tmpfs mode=0700,nosuid,nodev,uid=0,gid=0  0       0" >> /etc/fstab
 
+# Install the kiosk UI and API while the image resolver still works.
+# The next block replaces /etc/resolv.conf with a symlink to /tmp/resolv.conf,
+# which kiosk-wifi creates only at boot, so name lookups fail after that.
+/usr/lib/tbw/install-tbw.sh
+
 # Create symlinks for configuration files which will later get created at runtime (in /tmp)
 rm /etc/hosts || true
 rm /etc/hostname || true
@@ -128,9 +133,6 @@ systemctl enable ssh
 # Raspberry Pi specific GPU-related services (generate Xorg config)
 systemctl enable glamor-test || true
 systemctl enable rp1-test || true
-
-# Kiosk UI into nginx, hardware API user and state tmpfs.
-/usr/lib/tbw/install-tbw.sh
 
 # generate a version info/build info file
 echo -n "Chromium version: " >> /version-info
