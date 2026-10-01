@@ -116,9 +116,19 @@ while [ "${HEALTH_WAIT}" -lt 60 ]; do
 	HEALTH_WAIT=$((HEALTH_WAIT + 1))
 done
 
-# start chromium
+# Accessibility must be on before Chromium starts, or Onboard cannot see
+# HTML text fields (including type=password). The schema override is the
+# default; this launches the AT-SPI bus for the session.
+if [ -x /usr/libexec/at-spi-bus-launcher ]; then
+	/usr/libexec/at-spi-bus-launcher --launch-immediately >/tmp/at-spi-bus.log 2>&1 &
+fi
+
+# App window rather than fullscreen. A fullscreen window covers a docked
+# keyboard and does not expose text focus, so staff cannot type a password.
+# Openbox shrinks a maximized app window when the keyboard docks.
 URL=$(get-ini /boot/firmware/kioskbrowser.ini browser url)
-chromium --start-fullscreen \
+chromium --app="${URL}" \
+		 --start-maximized \
 		 --allow-insecure-localhost \
 		 --autoplay-policy=no-user-gesture-required \
 		 --check-for-update-interval=1 \
@@ -129,7 +139,7 @@ chromium --start-fullscreen \
 		 --disable-pinch \
 		 --disable-session-crashed-bubble \
 		 --disable-smooth-scrolling \
-		 --kiosk \
+		 --force-renderer-accessibility \
 		 --noerrdialogs \
 		 --overscroll-history-navigation=0 \
 		 --simulate-critical-update \
@@ -140,18 +150,29 @@ chromium --start-fullscreen \
 		 ${CHROME_DARK_MODE_FLAGS} \
 		 ${CHROME_GPU_FLAGS} \
 		 ${CHROME_LOW_END_FLAGS} \
-		 ${CHROME_CACHE_FLAGS} \
-		 ${URL} &
+		 ${CHROME_CACHE_FLAGS} &
 
-# On-screen keyboard (always-on-top overlay; Italian layout follows XKB)
+CHROME_WAIT=0
+while [ "${CHROME_WAIT}" -lt 20 ]; do
+	CHROME_WIN=$(xdotool search --onlyvisible --class '[Cc]hromium' 2>/dev/null | head -n 1 || true)
+	if [ -n "${CHROME_WIN}" ]; then
+		xdotool windowstate --add MAXIMIZED_VERT "${CHROME_WIN}" || true
+		xdotool windowstate --add MAXIMIZED_HORZ "${CHROME_WIN}" || true
+		break
+	fi
+	sleep 0.5
+	CHROME_WAIT=$((CHROME_WAIT + 1))
+done
+
+# On-screen keyboard. Hidden until an editable field is focused, then hidden
+# again when focus leaves it. Italian layout follows the XKB map set above.
+# dconf is not writable on the read-only root, so system defaults are reapplied
+# from /etc/onboard/onboard-defaults.conf on every start.
 ONSCREEN=$(get-ini /boot/firmware/kioskbrowser.ini keyboard onscreen)
 if [ "${ONSCREEN}" = "1" ] && command -v onboard >/dev/null 2>&1
 then
-	gsettings set org.onboard.window disable-in-fullscreen false || true
-	gsettings set org.onboard.window force-to-top true || true
-	gsettings set org.onboard.window docking-enabled true || true
-	gsettings set org.onboard.window docking-edge bottom || true
-	onboard &
+	touch /tmp/onboard-use-system-defaults
+	onboard >/tmp/onboard.log 2>&1 &
 fi
 
 # if a cache clearing interval is specified, launch the cache-clear-timer (while true, sleep, rm -rf)

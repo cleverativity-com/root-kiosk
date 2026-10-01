@@ -134,6 +134,10 @@ systemctl enable ssh
 systemctl enable glamor-test || true
 systemctl enable rp1-test || true
 
+# Accessibility default used by Onboard auto-show. The override is already
+# in /usr/share/glib-2.0/schemas from the skeleton; compile it into the cache.
+glib-compile-schemas /usr/share/glib-2.0/schemas
+
 # generate a version info/build info file
 echo -n "Chromium version: " >> /version-info
 dpkg --list | grep "ii  chromium " >> /version-info
