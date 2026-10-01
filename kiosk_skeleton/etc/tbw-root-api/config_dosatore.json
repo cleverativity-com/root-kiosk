@@ -1,0 +1,5 @@
+{
+  "stepsPerMl": 1200,
+  "retentionSteps": 1000,
+  "dosingFrequencyHz": 6400
+}

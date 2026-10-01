@@ -1,0 +1,24 @@
+#!/bin/bash
+# The USB label printer node is created root-only. tbw-root-api opens it as
+# an unprivileged user, so it must be mode 666 once it exists.
+set -euo pipefail
+
+device="/dev/usb/lp0"
+tries=20
+if [ "${1:-}" = "--now" ]; then
+	tries=1
+fi
+
+attempt=0
+while [ "${attempt}" -lt "${tries}" ]; do
+	if [ -e "${device}" ]; then
+		chmod 666 "${device}"
+		exit 0
+	fi
+	attempt=$((attempt + 1))
+	if [ "${attempt}" -lt "${tries}" ]; then
+		sleep 1
+	fi
+done
+
+exit 0

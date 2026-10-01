@@ -5,8 +5,9 @@ This repository builds a **Cleverativity kiosk image** (root-kiosk).
 
 Defaults baked into `/boot/firmware`:
 
-- Homepage: `https://a26-tbw-root-app-main.srvnve01.cleverativity.com/`
-- Splash screen: Cleverativity logo (`splash.png`)
+- Homepage: the on-device TBW kiosk UI at `http://127.0.0.1/`
+- Hardware API: `tbw-root-api` on `127.0.0.1:8765`, reached by the UI through nginx at `/api/v1`
+- Splash screen: Root SNC logo (`splash.png`)
 - Keyboard layout: Italian (`it`) plus an on-screen keyboard (onboard)
 - Screen never blanks
 - WiFi: `CleverWiFi` and `CleverWiFiX`
@@ -49,9 +50,9 @@ Other similar projects:
 ## Key features
 - [Images built via CI](https://github.com/cleverativity/root-kiosk/blob/main/.github/workflows/main.yml) and published to [Releases](https://github.com/cleverativity/root-kiosk/releases) on every push to `main`
 - WiFi & Ethernet connection support
-- Raspberry Pi & PC (64-bit) compatibility
+- Raspberry Pi 5 (64-bit)
 - [USB flash drive, USB SSD, etc. compatible](#how-to--installation-guide)
-- aarch64 images for Raspberry Pis (_significant_ performance improvements over armv7/32bit ARM)
+- aarch64 image for Raspberry Pi 5
 - Read-only filesystem (no more broken SD cards)
 - Browser cache can be cleared at configurable intervals
 - [HTTP watchdog (website needs to send heartbeat messages via XHR/AJAX to localhost)](#http-watchdog-functionality)
@@ -69,11 +70,7 @@ Other similar projects:
 - [Local webserver with PHP support](#local-webserver) (can host simple HTML, landing pages, slideshows, iFrame mechanisms, etc.)
 
 ## Supported platforms
-- Raspberry Pi 3, 4, 5, Zero 2 (W): use `root-kiosk-*-arm64-raspberrypi.img.xz`
-- PCs with UEFI (Intel, AMD or Nvidia GPUs): use `x86.img.xz`
-
-**not recommended, but working**
-- Raspberry Pi 1, 2, Zero (W) (very slow, 32bit only, try to avoid): use `root-kiosk-*-armhf-raspberrypi.img.xz`
+- Raspberry Pi 5: use `root-kiosk-*-arm64-raspberrypi.img.xz`
 
 ## Application examples
 - Digital signage
@@ -109,9 +106,6 @@ Other similar projects:
 > root-kiosk does not have an installer for x86 PCs. On PCs, you'll need to write the image to the storage somehow.
 > Either write the storage media (like NVMe or SATA storage) externally using another PC or boot a Linux Live-ISO and use dd to flash the image.
 
-> [!WARNING]  
-> Don't use the `armhf` images on Raspberry Pi 3 or newer (or the Zero 2 (W)). It will work, but performance will be impacted severely.
-
 Just like any other Raspberry Pi image:   
 Download the current .img.xz file from the [Releases](https://github.com/cleverativity/root-kiosk/releases) page and flash it to a storage device of your choice.  
 SD cards, USB flash drives, USB SSDs, SATA SSDs, NVMe SSDs are all good options.  
@@ -146,6 +140,18 @@ setInterval(function() {
 ```
 
 Whenever the heartbeat stops (for whatever reason), the device will first restart the X11 environment (browser, window manager, etc.) and later (if it hasn't recovered) the whole system by rebooting.
+
+## TBW kiosk app and API
+
+Chromium opens the TBW kiosk UI (`apps/tbw-root-kiosk-app`) from nginx on this machine. nginx serves that UI from `/var/www/html` and proxies `/api/` plus `/health` to the `tbw-root-api` systemd service, which listens on `127.0.0.1:8765` only.
+
+The image build downloads the published UI from `https://a26-tbw-root-kiosk-app-main.srvnve01.cleverativity.com/`. To install the copies from [accleverate-v26](https://github.com/cleverativity-com/accleverate-v26) instead, set the GitHub Actions secret `ACCLEVERATE_READ_TOKEN` (read access to that repository). The workflow sparse-checkouts `apps/tbw-root-kiosk-app` and `services/tbw-root-api` into `third_party/accleverate-v26`, and `build.sh` installs them.
+
+Without that checkout, the image runs the bundled API in `kiosk_skeleton/opt/tbw-root-api`. It implements the same `/api/v1` contract the kiosk UI calls and simulates the dispenser. It does not drive GPIO; the upstream service owns the pin map.
+
+At boot, and again whenever the USB printer appears, the image runs `chmod 666 /dev/usb/lp0` so the API can open the label printer.
+
+Heartbeat and screenshot PHP endpoints stay on nginx next to the kiosk UI.
 
 ## Local webserver
 root-kiosk ships with an nginx webserver and a PHP runtime by default (which is used internally for the heartbeat mechanism).  

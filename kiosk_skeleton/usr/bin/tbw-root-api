@@ -1,0 +1,30 @@
+#!/bin/bash
+# Start the local TBW hardware API on localhost.
+set -euo pipefail
+
+export PYTHONDONTWRITEBYTECODE=1
+export PYTHONPYCACHEPREFIX="${PYTHONPYCACHEPREFIX:-/tmp/tbw-pycache}"
+mkdir -p "${PYTHONPYCACHEPREFIX}" /var/lib/tbw-root-api || true
+
+if [ -f /etc/tbw-root-api/app.env ]; then
+	# shellcheck disable=SC1091
+	set -a
+	# shellcheck source=/dev/null
+	. /etc/tbw-root-api/app.env
+	set +a
+fi
+
+APP="${TBW_UVICORN_APP:-tbw_root_api.main:app}"
+HOST="${TBW_HOST:-127.0.0.1}"
+PORT="${TBW_PORT:-8765}"
+
+if [ -x /opt/tbw-root-api/venv/bin/python ]; then
+	PY=/opt/tbw-root-api/venv/bin/python
+elif [ -d /opt/tbw-root-api/tbw_root_api ]; then
+	PY=/usr/bin/python3
+	export PYTHONPATH="/opt/tbw-root-api${PYTHONPATH:+:$PYTHONPATH}"
+else
+	PY=/usr/bin/python3
+fi
+
+exec "${PY}" -m uvicorn "${APP}" --host "${HOST}" --port "${PORT}"

@@ -5,7 +5,7 @@ set -x -e
 apt update
 
 APT_LISTCHANGES_FRONTEND=none DEBIAN_FRONTEND=noninteractive apt dist-upgrade -y --option=Dpkg::Options::=--force-confdef
-DEBIAN_FRONTEND=noninteractive apt install -y wget curl fonts-noto-color-emoji lightdm openbox nginx php-fpm php-cli chromium autossh unclutter x11-xserver-utils x11-xkb-utils xdotool htop nano openssh-server rsync x11vnc lm-sensors ntpsec-ntpdate scrot wireless-regdb fontconfig console-data ifupdown iproute2 wpasupplicant iw wireless-tools haveged rfkill fbi feh openvpn nftables onboard at-spi2-core dbus-x11 dconf-cli dconf-gsettings-backend
+DEBIAN_FRONTEND=noninteractive apt install -y wget curl ca-certificates fonts-noto-color-emoji lightdm openbox nginx php-fpm php-cli chromium autossh unclutter x11-xserver-utils x11-xkb-utils xdotool htop nano openssh-server rsync x11vnc lm-sensors ntpsec-ntpdate scrot wireless-regdb fontconfig console-data ifupdown iproute2 wpasupplicant iw wireless-tools haveged rfkill fbi feh openvpn nftables onboard at-spi2-core dbus-x11 dconf-cli dconf-gsettings-backend python3 python3-venv python3-fastapi python3-uvicorn python3-pydantic
 
 rsync -a --chown=root:root "/kiosk_skeleton/." "/"
 
@@ -61,6 +61,11 @@ echo "tmpfs		/home/pi/.config/chromium/ tmpfs mode=0755,nosuid,nodev,uid=1000,gi
 echo "tmpfs		/home/pi/.pki/ tmpfs mode=0755,nosuid,nodev,uid=1000,gid=1000  0       0" >> /etc/fstab
 echo "tmpfs		/home/pi/.ssh/ tmpfs mode=0700,nosuid,nodev,uid=1000,gid=1000  0       0" >> /etc/fstab
 echo "tmpfs		/root/.ssh/ tmpfs mode=0700,nosuid,nodev,uid=0,gid=0  0       0" >> /etc/fstab
+
+# Install the kiosk UI and API while the image resolver still works.
+# The next block replaces /etc/resolv.conf with a symlink to /tmp/resolv.conf,
+# which kiosk-wifi creates only at boot, so name lookups fail after that.
+/usr/lib/tbw/install-tbw.sh
 
 # Create symlinks for configuration files which will later get created at runtime (in /tmp)
 rm /etc/hosts || true
@@ -121,6 +126,8 @@ systemctl disable openvpn-client@.service || true
 systemctl enable ntpdate
 systemctl enable lightdm
 systemctl enable nginx
+systemctl enable kiosk-printer
+systemctl enable tbw-root-api
 systemctl enable ssh
 
 # Raspberry Pi specific GPU-related services (generate Xorg config)

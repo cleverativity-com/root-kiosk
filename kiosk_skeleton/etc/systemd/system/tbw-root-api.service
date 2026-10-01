@@ -1,0 +1,21 @@
+[Unit]
+Description=TBW Root local hardware API
+After=network.target kiosk-printer.service
+Before=lightdm.service
+
+[Service]
+Type=simple
+User=tbw
+Group=tbw
+WorkingDirectory=/var/lib/tbw-root-api
+Environment=TBW_HOST=127.0.0.1
+Environment=TBW_PORT=8765
+Environment=TBW_HARDWARE_MODE=sim
+Environment=TBW_STATE_DIR=/var/lib/tbw-root-api
+Environment=TBW_CONFIG=/etc/tbw-root-api/config_dosatore.json
+ExecStart=/usr/bin/tbw-root-api
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

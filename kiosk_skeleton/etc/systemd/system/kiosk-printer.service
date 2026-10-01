@@ -1,0 +1,12 @@
+[Unit]
+Description=Allow the kiosk service to use the USB printer on lp0
+After=systemd-udevd.service
+Before=tbw-root-api.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/kiosk-printer
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
