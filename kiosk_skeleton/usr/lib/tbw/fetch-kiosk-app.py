@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Download the published TBW kiosk UI into the nginx document root.
 
-The UI is the production build of apps/tbw-root-kiosk-app. Asset names are
-content-hashed, so this crawls index.html and each script/style it references.
+The UI is the production build of apps/tbw-root-kiosk-app. Hashed bundles
+live under /assets, and the quiz illustrations live under /images. Those
+illustration URLs are often built at runtime (`/images/kiosk/` + `gender-f.png`),
+so this crawl keeps directory prefixes and filenames that appear in the same
+file, not only complete URLs.
 """
 
 from __future__ import annotations
@@ -18,8 +21,18 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from urllib.parse import urlsplit
 
+# Stop at quotes, backticks, and template placeholders so a runtime
+# concatenation (`/images/kiosk/${file}`) is not treated as one URL.
+_URL_ATOM = r"""[^"'`\\\s>),${}]+"""
 ASSET_RE = re.compile(
-    r"""(?:(?:src|href)=)?["']?(?P<url>(?:https?:)?//[^"'\\\s>),]+|/(?:assets|icons)/[^"'\\\s>),]+|/(?:favicon\.ico|manifest\.json)|\./[^"'\\\s>),]+|(?:assets|icons)/[^"'\\\s>),]+)""",
+    rf"""(?:(?:src|href)=|url\()?["'`]?(?P<url>(?:https?:)?//{_URL_ATOM}|/(?:assets|icons|images)/{_URL_ATOM}|/(?:favicon\.ico|manifest\.json)|\./{_URL_ATOM}|(?:assets|icons|images)/{_URL_ATOM})""",
+    re.IGNORECASE,
+)
+PREFIX_RE = re.compile(
+    r"""(?P<prefix>/?(?:images|assets|icons)/[A-Za-z0-9_.-]*/)"""
+)
+FILENAME_RE = re.compile(
+    r"""[`'"](?P<name>[A-Za-z0-9][A-Za-z0-9_.-]*\.(?:png|jpe?g|gif|webp|svg|ico|avif))[`'"]""",
     re.IGNORECASE,
 )
 SCAN_SUFFIXES = {".html", ".js", ".css", ".json", ".svg"}
@@ -46,8 +59,8 @@ WORKERS = 24
 
 
 def _normalize(page_url: str, raw: str) -> str | None:
-    raw = raw.strip().strip("\"'")
-    if not raw or raw.startswith(("data:", "mailto:", "javascript:")):
+    raw = raw.strip().strip("\"'`")
+    if not raw or raw.startswith(("data:", "mailto:", "javascript:", "${")):
         return None
     if raw.startswith("//"):
         raw = "https:" + raw
@@ -65,7 +78,7 @@ def _normalize(page_url: str, raw: str) -> str | None:
     elif raw.startswith("./"):
         parent = urlsplit(page_url).path.rsplit("/", 1)[0]
         path = f"{parent}/{raw[2:]}"
-    elif raw.startswith("assets/") or raw.startswith("icons/"):
+    elif raw.startswith(("assets/", "icons/", "images/")):
         path = "/" + raw
     else:
         return None
@@ -75,6 +88,34 @@ def _normalize(page_url: str, raw: str) -> str | None:
     if ".." in path.split("/"):
         return None
     return path
+
+
+def asset_paths_in(page_url: str, text: str) -> list[str]:
+    """Paths this document asks the browser to load.
+
+    Complete URLs are taken as written. The published kiosk bundle also
+    builds quiz art as a directory prefix plus a filename literal, so those
+    two pieces from the same file are joined.
+    """
+    found: list[str] = []
+    seen: set[str] = set()
+
+    def add(raw: str) -> None:
+        path = _normalize(page_url, raw)
+        if path and path not in seen:
+            seen.add(path)
+            found.append(path)
+
+    for match in ASSET_RE.finditer(text):
+        add(match.group("url"))
+
+    prefixes = list(dict.fromkeys(PREFIX_RE.findall(text)))
+    names = list(dict.fromkeys(FILENAME_RE.findall(text)))
+    if len(prefixes) <= 32 and len(names) <= 200:
+        for prefix in prefixes:
+            for name in names:
+                add(f"{prefix}{name}")
+    return found
 
 
 def _dest_for(root: Path, path: str) -> Path:
@@ -131,9 +172,8 @@ def fetch(url: str, dest: Path) -> list[str]:
         discovered: list[str] = []
         text = payload.decode("utf-8", errors="ignore")
         page = origin + ("/" if path == "/" else path)
-        for match in ASSET_RE.finditer(text):
-            normalized = _normalize(page, match.group("url"))
-            if normalized and reserve(normalized):
+        for normalized in asset_paths_in(page, text):
+            if reserve(normalized):
                 discovered.append(normalized)
         return discovered
 
@@ -146,6 +186,13 @@ def fetch(url: str, dest: Path) -> list[str]:
             wave = discovered
     if not (dest / "index.html").is_file():
         raise RuntimeError("kiosk download did not include index.html")
+    referenced_images = [path for path in seen if path.startswith("/images/")]
+    saved_images = [path for path in written if path.startswith("/images/")]
+    if referenced_images and not saved_images:
+        raise RuntimeError(
+            "kiosk UI referenced /images/ files but none were downloaded: "
+            + ", ".join(referenced_images[:8])
+        )
     return written
 
 
