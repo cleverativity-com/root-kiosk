@@ -47,6 +47,21 @@ server {
                 fastcgi_pass unix:/run/php-fpm.sock;
         }
 
+        # Quiz art, icons, and hashed bundles are real files. ^~ stops the
+        # SPA fallback below from answering a missing or present image with
+        # index.html (200 text/html), which the browser will not paint.
+        location ^~ /images/ {
+                try_files $uri =404;
+        }
+
+        location ^~ /icons/ {
+                try_files $uri =404;
+        }
+
+        location ^~ /assets/ {
+                try_files $uri =404;
+        }
+
         # Kiosk single-page app (apps/tbw-root-kiosk-app).
         location / {
                 try_files $uri $uri/ /index.html;
