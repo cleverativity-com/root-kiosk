@@ -11,6 +11,10 @@ WEB_ROOT=/var/www/html
 if ! id tbw >/dev/null 2>&1; then
 	useradd --system --user-group --home-dir /var/lib/tbw-root-api --shell /usr/sbin/nologin tbw
 fi
+if ! getent group gpio >/dev/null 2>&1; then
+	groupadd --system gpio
+fi
+usermod -aG gpio tbw
 
 mkdir -p /var/lib/tbw-root-api /etc/tbw-root-api
 if ! grep -q '/var/lib/tbw-root-api' /etc/fstab; then
@@ -25,7 +29,8 @@ install_upstream_api() {
 	fi
 	echo "Installing tbw-root-api from ${api}"
 	rm -rf /opt/tbw-root-api/venv
-	python3 -m venv /opt/tbw-root-api/venv
+	# system site packages so this venv can import python3-lgpio (required on Pi 5).
+	python3 -m venv --system-site-packages /opt/tbw-root-api/venv
 	if [ -f "${api}/pyproject.toml" ] || [ -f "${api}/setup.py" ]; then
 		/opt/tbw-root-api/venv/bin/pip install --no-cache-dir "${api}"
 	elif [ -f "${api}/requirements.txt" ]; then
@@ -44,6 +49,10 @@ install_upstream_api() {
 	fi
 	# The service entry point matches the published API package name.
 	printf 'TBW_UVICORN_APP=%s\n' "tbw_root_api.main:app" > /etc/tbw-root-api/app.env
+	# The venv does not see the system gpiozero package. The copy-only layout has no venv.
+	if [ -x /opt/tbw-root-api/venv/bin/pip ]; then
+		/opt/tbw-root-api/venv/bin/pip install --no-cache-dir gpiozero
+	fi
 	return 0
 }
 

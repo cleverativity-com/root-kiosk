@@ -147,7 +147,7 @@ Chromium opens the TBW kiosk UI (`apps/tbw-root-kiosk-app`) from nginx on this m
 
 The image build downloads the published UI from `https://a26-tbw-root-kiosk-app-main.srvnve01.cleverativity.com/`. To install the copies from [accleverate-v26](https://github.com/cleverativity-com/accleverate-v26) instead, set the GitHub Actions secret `ACCLEVERATE_READ_TOKEN` (read access to that repository). The workflow sparse-checkouts `apps/tbw-root-kiosk-app` and `services/tbw-root-api` into `third_party/accleverate-v26`, and `build.sh` installs them.
 
-Without that checkout, the image runs the bundled API in `kiosk_skeleton/opt/tbw-root-api`. It implements the same `/api/v1` contract the kiosk UI calls and simulates the dispenser. It does not drive GPIO; the upstream service owns the pin map.
+Without that checkout, the image runs the bundled API in `kiosk_skeleton/opt/tbw-root-api`. It implements the same `/api/v1` contract the kiosk UI calls. `tbw-root-api.service` sets `TBW_HARDWARE_MODE=gpio`, and that process pulses pumps 1–5 on BCM pins `(12,16)`, `(5,6)`, `(19,26)`, `(24,25)`, `(20,21)` through `gpiozero`. The `tbw` service user is in group `gpio`. If the pins cannot be opened, `POST /api/v1/dispense` returns `HARDWARE_OFFLINE` instead of marking the job completed. `TBW_HARDWARE_MODE=sim` still exists for tests and does not move the pumps.
 
 At boot, and again whenever the USB printer appears, the image runs `chmod 666 /dev/usb/lp0` so the API can open the label printer.
 

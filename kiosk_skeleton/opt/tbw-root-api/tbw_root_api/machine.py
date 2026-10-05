@@ -1,9 +1,9 @@
 """Dispenser state machine for the local TBW hardware API.
 
-The kiosk UI talks to this process on /api/v1. Pump motion is simulated:
-the image build uses this service when services/tbw-root-api from
-accleverate-v26 is not available to install. GPIO pin maps live in that
-upstream service; this process does not drive pins.
+The kiosk UI talks to this process on /api/v1. The image runs this
+service when services/tbw-root-api from accleverate-v26 is not installed.
+TBW_HARDWARE_MODE=gpio pulses the stepper pumps. TBW_HARDWARE_MODE=sim
+only advances the job, which is what the unit tests use.
 """
 
 from __future__ import annotations
@@ -16,6 +16,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from tbw_root_api.pumps import DoseCancelled, open_gpio_driver, run_dose
 
 
 PUMP_COUNT = 5
@@ -131,7 +133,10 @@ class Machine:
         self.shot_seconds = _env_float("TBW_SHOT_SECONDS", 0.8)
         self.initial_shots = _env_int("TBW_INITIAL_SHOTS", 100)
         self.port = _env_int("TBW_PORT", 8765)
-        self.hardware_mode = os.environ.get("TBW_HARDWARE_MODE", "sim")
+        raw_mode = os.environ.get("TBW_HARDWARE_MODE", "sim").strip().lower()
+        self.hardware_mode = raw_mode if raw_mode in {"gpio", "sim"} else "sim"
+        self.pump_driver = None
+        self.gpio_error: str | None = None
         self.config = self._load_config()
         self.pumps = [
             Pump(pump_id=i, bag_id=i, remaining_shots=self.initial_shots)
@@ -158,16 +163,25 @@ class Machine:
             },
         )
         if self.hardware_mode == "gpio":
-            self.log(
-                "tbw_root_api.hardware.pins",
-                "log",
-                "Bundled API has no dispenser pin map; using simulated pumps",
-            )
+            try:
+                self.pump_driver = open_gpio_driver()
+            except Exception as exc:
+                self.gpio_error = str(exc)
+                self.log(
+                    "tbw_root_api.hardware.pins",
+                    "hardware.gpio_failed",
+                    "GPIO pump driver failed",
+                    level="error",
+                    details={"error": self.gpio_error},
+                )
         self.log(
             "tbw_root_api",
             "hardware.mode",
-            f"Hardware mode is {self.hardware_mode if self.hardware_mode != 'gpio' else 'sim'}",
-            details={"mode": "sim", "gpioAvailable": False},
+            f"Hardware mode is {self.hardware_mode}",
+            details={
+                "mode": self.hardware_mode,
+                "gpioAvailable": self.pump_driver is not None,
+            },
         )
 
     def _load_config(self) -> dict[str, int]:
@@ -249,6 +263,8 @@ class Machine:
     def reset(self) -> None:
         if self.active_job is not None:
             self.active_job.cancel.set()
+        if self.pump_driver is not None:
+            self.pump_driver.all_off()
         for task in list(self._tasks):
             task.cancel()
         self._tasks.clear()
@@ -344,6 +360,13 @@ class Machine:
                 }
             self._require_ready()
             shots = self._normalize_shots(pump_shots)
+            if self.hardware_mode == "gpio" and self.pump_driver is None:
+                raise ApiError(
+                    503,
+                    "HARDWARE_OFFLINE",
+                    "Pump GPIO is not available",
+                    details={"error": self.gpio_error or "driver not open"},
+                )
             job = Job(
                 job_id=str(uuid.uuid4()),
                 kind="dispense",
@@ -353,7 +376,7 @@ class Machine:
             )
             self.jobs[job.job_id] = job
             self.by_request[request_id] = job.job_id
-            if self.shot_seconds <= 0:
+            if self.pump_driver is None and self.shot_seconds <= 0:
                 self._apply_shots(job)
                 self.active_job = None
                 self.machine_state = "ready"
@@ -413,48 +436,122 @@ class Machine:
 
     async def _run_dispense(self, job: Job) -> None:
         try:
-            total = sum(job.requested_shots) or 1
-            done = 0
-            for index, count in enumerate(job.requested_shots):
-                if count <= 0:
-                    continue
-                job.current_pump_id = index + 1
-                for _ in range(count):
-                    if job.cancel.is_set():
-                        job.status = "cancelled"
-                        job.errors.append(
-                            {
-                                "code": "MACHINE_BUSY",
-                                "severity": "blocking",
-                                "message": "Dispense cancelled",
-                            }
-                        )
-                        return
-                    await asyncio.sleep(self.shot_seconds)
-                    if job.cancel.is_set():
-                        job.status = "cancelled"
-                        return
-                    async with self.lock:
-                        job.completed_shots[index] += 1
-                        self.pumps[index].remaining_shots -= 1
-                        self._save_state()
-                        done += 1
-                        job.progress_percent = int(done * 100 / total)
-            async with self.lock:
-                job.progress_percent = 100
-                job.current_pump_id = None
-                job.status = "completed"
-            self.log(
-                "tbw_root_api.hardware.pumps",
-                "dispense.completed",
-                "Dispense completed",
-                details={"jobId": job.job_id},
-            )
+            if self.pump_driver is not None:
+                await self._run_gpio_dispense(job)
+            else:
+                await self._run_simulated_dispense(job)
         finally:
             async with self.lock:
                 if self.active_job is job:
                     self.active_job = None
                     self.machine_state = "ready"
+
+    async def _run_simulated_dispense(self, job: Job) -> None:
+        total = sum(job.requested_shots) or 1
+        done = 0
+        for index, count in enumerate(job.requested_shots):
+            if count <= 0:
+                continue
+            job.current_pump_id = index + 1
+            for _ in range(count):
+                if job.cancel.is_set():
+                    job.status = "cancelled"
+                    job.errors.append(
+                        {
+                            "code": "MACHINE_BUSY",
+                            "severity": "blocking",
+                            "message": "Dispense cancelled",
+                        }
+                    )
+                    return
+                await asyncio.sleep(self.shot_seconds)
+                if job.cancel.is_set():
+                    job.status = "cancelled"
+                    return
+                async with self.lock:
+                    job.completed_shots[index] += 1
+                    self.pumps[index].remaining_shots -= 1
+                    self._save_state()
+                    done += 1
+                    job.progress_percent = int(done * 100 / total)
+        async with self.lock:
+            job.progress_percent = 100
+            job.current_pump_id = None
+            job.status = "completed"
+        self.log(
+            "tbw_root_api.hardware.pumps",
+            "dispense.completed",
+            "Dispense completed",
+            details={"jobId": job.job_id, "simulated": True},
+        )
+
+    async def _run_gpio_dispense(self, job: Job) -> None:
+        driver = self.pump_driver
+        if driver is None:
+            return
+
+        def on_progress(done: int, total: int) -> None:
+            job.progress_percent = int(done * 100 / total) if total else 100
+
+        try:
+            await asyncio.to_thread(
+                run_dose,
+                driver,
+                job.requested_shots,
+                steps_per_ml=self.config["stepsPerMl"],
+                retention_steps=self.config["retentionSteps"],
+                dosing_frequency_hz=self.config["dosingFrequencyHz"],
+                should_stop=job.cancel.is_set,
+                on_progress=on_progress,
+            )
+        except DoseCancelled:
+            async with self.lock:
+                if job.status == "running":
+                    job.status = "cancelled"
+                    job.errors.append(
+                        {
+                            "code": "MACHINE_BUSY",
+                            "severity": "blocking",
+                            "message": "Dispense cancelled",
+                        }
+                    )
+            return
+        except Exception as exc:
+            driver.all_off()
+            async with self.lock:
+                job.status = "failed"
+                job.current_pump_id = None
+                job.errors.append(
+                    {
+                        "code": "HARDWARE_OFFLINE",
+                        "severity": "blocking",
+                        "message": str(exc) or "Pump GPIO failed during dispense",
+                    }
+                )
+            self.log(
+                "tbw_root_api.hardware.pumps",
+                "dispense.failed",
+                "GPIO dispense failed",
+                level="error",
+                details={"jobId": job.job_id, "error": str(exc)},
+            )
+            return
+
+        async with self.lock:
+            for index, count in enumerate(job.requested_shots):
+                job.completed_shots[index] = count
+                if count > 0:
+                    self.pumps[index].remaining_shots -= count
+            job.progress_percent = 100
+            job.current_pump_id = None
+            job.status = "completed"
+            self._save_state()
+        self.log(
+            "tbw_root_api.hardware.pumps",
+            "dispense.completed",
+            "Dispense completed",
+            details={"jobId": job.job_id, "simulated": False},
+        )
 
     def job_status(self, job_id: str) -> dict[str, Any]:
         job = self.jobs.get(job_id)
@@ -478,6 +575,8 @@ class Machine:
                     )
                 self.active_job = None
             self.machine_state = "ready"
+            if self.pump_driver is not None:
+                self.pump_driver.all_off()
             self.log("tbw_root_api.hardware", "emergency_stop", "Emergency stop")
             return {"machineState": self.machine_state, "message": "Emergency stop"}
 
@@ -616,7 +715,7 @@ class Machine:
             "items": items,
             "lastSeq": self._seq,
             "filePath": str(self.log_path),
-            "hardwareMode": "sim",
+            "hardwareMode": self.hardware_mode,
         }
 
     async def _finish_soon(self, job: Job, next_state: str) -> None:

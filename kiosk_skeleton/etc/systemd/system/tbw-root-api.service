@@ -10,9 +10,13 @@ Group=tbw
 WorkingDirectory=/var/lib/tbw-root-api
 Environment=TBW_HOST=127.0.0.1
 Environment=TBW_PORT=8765
-Environment=TBW_HARDWARE_MODE=sim
+# Bundled API. gpio pulses the steppers; sim marks the job finished without moving them.
+Environment=TBW_HARDWARE_MODE=gpio
+# Upstream services/tbw-root-api reads this name when that package replaces the bundled one.
+Environment=TBW_HARDWARE=gpio
 Environment=TBW_STATE_DIR=/var/lib/tbw-root-api
 Environment=TBW_CONFIG=/etc/tbw-root-api/config_dosatore.json
+SupplementaryGroups=gpio
 ExecStart=/usr/bin/tbw-root-api
 Restart=on-failure
 RestartSec=2
