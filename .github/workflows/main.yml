@@ -43,12 +43,7 @@ jobs:
             echo "Checked out ${name} $(git -C third_party/accleverate-v26 rev-parse HEAD)"
             pkg="third_party/accleverate-v26/apps/tbw-root-kiosk-app/package.json"
             if [ -f "${pkg}" ]; then
-              python3 - "${pkg}" <<'PY'
-import json, sys
-data = json.load(open(sys.argv[1], encoding="utf-8"))
-print(f"tbw-root-kiosk-app name={data.get('name', '')}")
-print(f"tbw-root-kiosk-app version={data.get('version', '')}")
-PY
+              python3 -c 'import json,sys; data=json.load(open(sys.argv[1], encoding="utf-8")); print("tbw-root-kiosk-app name=" + str(data.get("name") or "")); print("tbw-root-kiosk-app version=" + str(data.get("version") or ""))' "${pkg}"
             else
               echo "tbw-root-kiosk-app package.json was not in the checkout."
             fi
