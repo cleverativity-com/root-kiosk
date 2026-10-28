@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - cursor/kiosk-gpio-dotenv-256b
+      - cursor/kiosk-image-release-45ec
   pull_request:
 
 permissions:
@@ -14,7 +14,7 @@ jobs:
   raspberrypi:
     # This branch publishes the image from the push workflow. Skip the
     # duplicate pull_request build so the release is not raced.
-    if: github.event_name != 'pull_request' || github.head_ref != 'cursor/kiosk-gpio-dotenv-256b'
+    if: github.event_name != 'pull_request' || github.head_ref != 'cursor/kiosk-image-release-45ec'
     runs-on: [ubuntu-24.04-arm]
 
     steps:
@@ -41,6 +41,17 @@ jobs:
               services/tbw-root-api || return 1
             git -C third_party/accleverate-v26 remote remove origin || true
             echo "Checked out ${name} $(git -C third_party/accleverate-v26 rev-parse HEAD)"
+            pkg="third_party/accleverate-v26/apps/tbw-root-kiosk-app/package.json"
+            if [ -f "${pkg}" ]; then
+              python3 - "${pkg}" <<'PY'
+import json, sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+print(f"tbw-root-kiosk-app name={data.get('name', '')}")
+print(f"tbw-root-kiosk-app version={data.get('version', '')}")
+PY
+            else
+              echo "tbw-root-kiosk-app package.json was not in the checkout."
+            fi
           }
           if [ -z "${ACCLEVERATE_READ_TOKEN}" ]; then
             echo "ACCLEVERATE_READ_TOKEN is unset."
@@ -72,7 +83,7 @@ jobs:
 
       - name: Determine release metadata
         id: meta
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/cursor/kiosk-gpio-dotenv-256b')
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/cursor/kiosk-image-release-45ec')
         run: |
           set -euo pipefail
           short_sha="$(git rev-parse --short=7 HEAD)"
@@ -86,7 +97,7 @@ jobs:
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/cursor/kiosk-gpio-dotenv-256b')
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/cursor/kiosk-image-release-45ec')
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
           name: ${{ steps.meta.outputs.name }}
