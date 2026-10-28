@@ -29,6 +29,9 @@ install_upstream_api() {
 	fi
 	echo "Installing tbw-root-api from ${api}"
 	rm -rf /opt/tbw-root-api/venv
+	# A checkout often ships TBW_HARDWARE=sim for the cloud container.
+	# Rewrite that before packaging so the installed tree pulses GPIO.
+	python3 /usr/lib/tbw/gpio_env.py --normalize-tree "${api}"
 	# system site packages so this venv can import python3-lgpio (required on Pi 5).
 	python3 -m venv --system-site-packages /opt/tbw-root-api/venv
 	if [ -f "${api}/pyproject.toml" ] || [ -f "${api}/setup.py" ]; then
@@ -53,6 +56,7 @@ install_upstream_api() {
 	if [ -x /opt/tbw-root-api/venv/bin/pip ]; then
 		/opt/tbw-root-api/venv/bin/pip install --no-cache-dir gpiozero
 	fi
+	python3 /usr/lib/tbw/gpio_env.py --normalize-tree /opt/tbw-root-api
 	return 0
 }
 
@@ -92,6 +96,13 @@ if [ -d "${SRC}" ]; then
 else
 	python3 /usr/lib/tbw/fetch-kiosk-app.py --url "${KIOSK_URL}" --dest "${WEB_ROOT}"
 fi
+
+# The kiosk .env is gpio even when the upstream package shipped sim.
+python3 /usr/lib/tbw/gpio_env.py --write /etc/tbw-root-api/.env
+if [ ! -f /etc/tbw-root-api/app.env ]; then
+	printf 'TBW_UVICORN_APP=%s\n' "tbw_root_api.main:app" > /etc/tbw-root-api/app.env
+fi
+python3 /usr/lib/tbw/gpio_env.py --normalize /etc/tbw-root-api/app.env --ensure
 
 chown -R www-data:www-data "${WEB_ROOT}"
 chown root:root /opt/tbw-root-api /usr/bin/tbw-root-api
