@@ -90,6 +90,19 @@ sudo chroot "${BUILD_DIR}" /kiosk_skeleton/build.sh
 
 sudo rm -r "${BUILD_DIR}/kiosk_skeleton"
 
+{
+	echo
+	echo "Hardware:"
+	sudo grep '^TBW_HARDWARE' "${BUILD_DIR}/etc/tbw-root-api/.env" || true
+	echo
+	echo "Kiosk UI:"
+	if sudo test -f "${BUILD_DIR}/etc/tbw-root-api/kiosk-ui-source"; then
+		sudo cat "${BUILD_DIR}/etc/tbw-root-api/kiosk-ui-source"
+	else
+		echo "kiosk_ui=not-recorded"
+	fi
+} | sudo tee -a "${BUILD_DIR}/version-info" >/dev/null
+
 cp "${BUILD_DIR}/version-info" version-info
 
 # trim all filesystems

@@ -60,6 +60,32 @@ install_upstream_api() {
 	return 0
 }
 
+write_ui_source() {
+	mkdir -p /etc/tbw-root-api
+	{
+		printf 'kiosk_ui=%s\n' "$1"
+		printf 'recorded_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+		if [ -d "${SRC}/.git" ] && command -v git >/dev/null 2>&1; then
+			printf 'git_revision=%s\n' "$(git -C "${SRC}" rev-parse HEAD)"
+			git -C "${SRC}" log -1 --format='git_subject=%s'
+		fi
+	} > /etc/tbw-root-api/kiosk-ui-source
+}
+
+download_published_ui() {
+	python3 /usr/lib/tbw/fetch-kiosk-app.py --url "${KIOSK_URL}" --dest "${WEB_ROOT}"
+	local headers last_modified etag
+	headers="$(curl -fsSI -A root-kiosk-image-build -L --max-redirs 3 "${KIOSK_URL}" || true)"
+	last_modified="$(printf '%s\n' "${headers}" | awk -F': ' 'tolower($1)=="last-modified" { value=$2 } END { gsub(/\r/, "", value); print value }')"
+	etag="$(printf '%s\n' "${headers}" | awk -F': ' 'tolower($1)=="etag" { value=$2 } END { gsub(/\r/, "", value); print value }')"
+	{
+		printf 'kiosk_ui=%s\n' "${KIOSK_URL}"
+		printf 'last_modified=%s\n' "${last_modified}"
+		printf 'etag=%s\n' "${etag}"
+		printf 'recorded_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+	} > /etc/tbw-root-api/kiosk-ui-source
+}
+
 install_upstream_ui() {
 	local app="${SRC}/apps/tbw-root-kiosk-app"
 	local dist=""
@@ -81,6 +107,7 @@ install_upstream_ui() {
 	fi
 	echo "Installing kiosk UI from ${dist}"
 	cp -a "${dist}/." "${WEB_ROOT}/"
+	write_ui_source "${dist}"
 	return 0
 }
 
@@ -90,11 +117,11 @@ if [ -d "${SRC}" ]; then
 	fi
 	if ! install_upstream_ui; then
 		echo "Upstream kiosk app has no dist/ build; downloading the published UI"
-		python3 /usr/lib/tbw/fetch-kiosk-app.py --url "${KIOSK_URL}" --dest "${WEB_ROOT}"
+		download_published_ui
 	fi
 	rm -rf "${SRC}"
 else
-	python3 /usr/lib/tbw/fetch-kiosk-app.py --url "${KIOSK_URL}" --dest "${WEB_ROOT}"
+	download_published_ui
 fi
 
 # The kiosk .env is gpio even when the upstream package shipped sim.
