@@ -29,6 +29,9 @@ install_upstream_api() {
 	fi
 	echo "Installing tbw-root-api from ${api}"
 	rm -rf /opt/tbw-root-api/venv
+	# A checkout often ships TBW_HARDWARE=sim for the cloud container.
+	# Rewrite that before packaging so the installed tree pulses GPIO.
+	python3 /usr/lib/tbw/gpio_env.py --normalize-tree "${api}"
 	# system site packages so this venv can import python3-lgpio (required on Pi 5).
 	python3 -m venv --system-site-packages /opt/tbw-root-api/venv
 	if [ -f "${api}/pyproject.toml" ] || [ -f "${api}/setup.py" ]; then
@@ -53,7 +56,34 @@ install_upstream_api() {
 	if [ -x /opt/tbw-root-api/venv/bin/pip ]; then
 		/opt/tbw-root-api/venv/bin/pip install --no-cache-dir gpiozero
 	fi
+	python3 /usr/lib/tbw/gpio_env.py --normalize-tree /opt/tbw-root-api
 	return 0
+}
+
+write_ui_source() {
+	mkdir -p /etc/tbw-root-api
+	{
+		printf 'kiosk_ui=%s\n' "$1"
+		printf 'recorded_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+		if [ -d "${SRC}/.git" ] && command -v git >/dev/null 2>&1; then
+			printf 'git_revision=%s\n' "$(git -C "${SRC}" rev-parse HEAD)"
+			git -C "${SRC}" log -1 --format='git_subject=%s'
+		fi
+	} > /etc/tbw-root-api/kiosk-ui-source
+}
+
+download_published_ui() {
+	python3 /usr/lib/tbw/fetch-kiosk-app.py --url "${KIOSK_URL}" --dest "${WEB_ROOT}"
+	local headers last_modified etag
+	headers="$(curl -fsSI -A root-kiosk-image-build -L --max-redirs 3 "${KIOSK_URL}" || true)"
+	last_modified="$(printf '%s\n' "${headers}" | awk -F': ' 'tolower($1)=="last-modified" { value=$2 } END { gsub(/\r/, "", value); print value }')"
+	etag="$(printf '%s\n' "${headers}" | awk -F': ' 'tolower($1)=="etag" { value=$2 } END { gsub(/\r/, "", value); print value }')"
+	{
+		printf 'kiosk_ui=%s\n' "${KIOSK_URL}"
+		printf 'last_modified=%s\n' "${last_modified}"
+		printf 'etag=%s\n' "${etag}"
+		printf 'recorded_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+	} > /etc/tbw-root-api/kiosk-ui-source
 }
 
 install_upstream_ui() {
@@ -77,6 +107,7 @@ install_upstream_ui() {
 	fi
 	echo "Installing kiosk UI from ${dist}"
 	cp -a "${dist}/." "${WEB_ROOT}/"
+	write_ui_source "${dist}"
 	return 0
 }
 
@@ -86,12 +117,19 @@ if [ -d "${SRC}" ]; then
 	fi
 	if ! install_upstream_ui; then
 		echo "Upstream kiosk app has no dist/ build; downloading the published UI"
-		python3 /usr/lib/tbw/fetch-kiosk-app.py --url "${KIOSK_URL}" --dest "${WEB_ROOT}"
+		download_published_ui
 	fi
 	rm -rf "${SRC}"
 else
-	python3 /usr/lib/tbw/fetch-kiosk-app.py --url "${KIOSK_URL}" --dest "${WEB_ROOT}"
+	download_published_ui
 fi
+
+# The kiosk .env is gpio even when the upstream package shipped sim.
+python3 /usr/lib/tbw/gpio_env.py --write /etc/tbw-root-api/.env
+if [ ! -f /etc/tbw-root-api/app.env ]; then
+	printf 'TBW_UVICORN_APP=%s\n' "tbw_root_api.main:app" > /etc/tbw-root-api/app.env
+fi
+python3 /usr/lib/tbw/gpio_env.py --normalize /etc/tbw-root-api/app.env --ensure
 
 chown -R www-data:www-data "${WEB_ROOT}"
 chown root:root /opt/tbw-root-api /usr/bin/tbw-root-api

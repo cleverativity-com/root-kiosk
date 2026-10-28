@@ -14,6 +14,8 @@ Environment=TBW_PORT=8765
 Environment=TBW_HARDWARE_MODE=gpio
 # Upstream services/tbw-root-api reads this name when that package replaces the bundled one.
 Environment=TBW_HARDWARE=gpio
+# /etc/tbw-root-api/.env is the hardware switch. It overrides the two lines above.
+EnvironmentFile=/etc/tbw-root-api/.env
 Environment=TBW_STATE_DIR=/var/lib/tbw-root-api
 Environment=TBW_CONFIG=/etc/tbw-root-api/config_dosatore.json
 SupplementaryGroups=gpio
