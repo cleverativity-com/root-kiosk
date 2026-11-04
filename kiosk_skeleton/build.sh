@@ -128,6 +128,7 @@ systemctl enable lightdm
 systemctl enable nginx
 systemctl enable kiosk-printer
 systemctl enable tbw-root-api
+systemctl enable kiosk-settings
 systemctl enable ssh
 
 # Raspberry Pi specific GPU-related services (generate Xorg config)

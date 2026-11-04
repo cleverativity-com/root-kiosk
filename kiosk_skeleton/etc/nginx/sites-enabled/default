@@ -14,6 +14,38 @@ server {
                 proxy_set_header Host $host;
         }
 
+        # Settings API (kiosk-settings on localhost). Longer prefixes than /api/.
+        location /api/v1/network {
+                proxy_pass http://127.0.0.1:8766;
+                proxy_http_version 1.1;
+                proxy_set_header Host $host;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_read_timeout 60s;
+        }
+
+        location /api/v1/dispenser {
+                proxy_pass http://127.0.0.1:8766;
+                proxy_http_version 1.1;
+                proxy_set_header Host $host;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_read_timeout 60s;
+        }
+
+        location /settings/docs {
+                proxy_pass http://127.0.0.1:8766;
+                proxy_set_header Host $host;
+        }
+
+        location /settings/redoc {
+                proxy_pass http://127.0.0.1:8766;
+                proxy_set_header Host $host;
+        }
+
+        location /settings/openapi.json {
+                proxy_pass http://127.0.0.1:8766;
+                proxy_set_header Host $host;
+        }
+
         location /api/ {
                 proxy_pass http://127.0.0.1:8765;
                 proxy_http_version 1.1;

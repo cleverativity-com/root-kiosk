@@ -1,10 +1,35 @@
 #!/bin/bash
+# Wi-Fi configuration for the read-only image.
+# network.json written by the settings API wins. Otherwise keep the
+# historical kioskbrowser.ini / wpa_supplicant.conf behavior.
 
-# configure DNS
+write_dhcp_stanza() {
+	cat > /tmp/wlan0-inet <<'EOF'
+auto wlan0
+allow-hotplug wlan0
+iface wlan0 inet dhcp
+	wpa-conf /etc/wpa_supplicant/wpa_supplicant.conf
+
+iface wlan0 inet6 auto
+EOF
+}
+
+if [ -f "/boot/firmware/kiosk-state/network.json" ]; then
+	export PYTHONDONTWRITEBYTECODE=1
+	export PYTHONPATH="/opt/kiosk-settings${PYTHONPATH:+:$PYTHONPATH}"
+	if python3 -m kiosk_settings.apply boot; then
+		exit 0
+	fi
+	echo "kiosk-settings: network.json was not applied; using kioskbrowser.ini" >&2
+fi
+
+# Legacy path. Factory DNS, then either a hand-written supplicant file or the INI.
 echo "nameserver 8.8.8.8" > /etc/resolv.conf
 echo "nameserver 2001:4860:4860::8888" >> /etc/resolv.conf
 echo "nameserver 8.8.4.4" >> /etc/resolv.conf
 echo "nameserver 2001:4860:4860::8844" >> /etc/resolv.conf
+
+write_dhcp_stanza
 
 if [ -f "/boot/firmware/wpa_supplicant.conf" ]; then
 	ln -sf /boot/firmware/wpa_supplicant.conf /tmp/wpa_supplicant.conf
