@@ -1,6 +1,6 @@
 [Unit]
-Description=Generate wpa_supplicant.conf from kioskbrowser.ini (supports ssid2+)
-Before=wpa_supplicant.service ifup@wlan0.service
+Description=Generate wlan0 configuration from network.json or kioskbrowser.ini
+Before=wpa_supplicant.service ifup@wlan0.service networking.service
 
 [Service]
 Type=oneshot

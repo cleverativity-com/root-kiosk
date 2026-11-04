@@ -1,0 +1,21 @@
+[Unit]
+Description=Kiosk settings API (Wi-Fi and dispenser identity)
+After=kiosk-wifi.service network.target
+Before=lightdm.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/kiosk-settings
+Environment=KIOSK_HOST=127.0.0.1
+Environment=KIOSK_PORT=8766
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONPYCACHEPREFIX=/tmp/kiosk-settings-pycache
+Environment=PYTHONPATH=/opt/kiosk-settings
+ExecStart=/usr/bin/kiosk-settings-api
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

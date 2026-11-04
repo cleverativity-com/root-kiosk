@@ -7,6 +7,7 @@ Defaults baked into `/boot/firmware`:
 
 - Homepage: the on-device TBW kiosk UI at `http://127.0.0.1/`
 - Hardware API: `tbw-root-api` on `127.0.0.1:8765`, reached by the UI through nginx at `/api/v1`
+- Settings API: `kiosk-settings` on `127.0.0.1:8766` (Wi-Fi, IPv4, and dispenser identity). Swagger at `http://127.0.0.1/settings/docs`
 - Splash screen: Root SNC logo (`splash.png`)
 - Keyboard layout: Italian (`it`) plus an on-screen keyboard (onboard) that appears only while a text field is focused
 - Screen never blanks
@@ -152,6 +153,46 @@ Without that checkout, the image runs the bundled API in `kiosk_skeleton/opt/tbw
 At boot, and again whenever the USB printer appears, the image runs `chmod 666 /dev/usb/lp0` so the API can open the label printer.
 
 Heartbeat and screenshot PHP endpoints stay on nginx next to the kiosk UI.
+
+## Kiosk settings API
+
+The root filesystem stays read-only. Chromium's profile is a tmpfs, so the UI cannot keep settings in `localStorage` across a reboot. `kiosk-settings` stores them on the boot partition in `/boot/firmware/kiosk-state/` and listens on `127.0.0.1:8766`. nginx serves the routes below on the same origin as the kiosk UI.
+
+- Swagger UI: `http://127.0.0.1/settings/docs`
+- OpenAPI document: `http://127.0.0.1/settings/openapi.json`
+
+The Swagger page loads its scripts from a CDN. When the kiosk is offline, use the OpenAPI document.
+
+Wi-Fi and IPv4 (tag **Network**):
+
+- `GET /api/v1/network/wifi` lists networks in range (`ssid`, `bssid`, `signal` in dBm, `frequency`, `security`).
+- `GET /api/v1/network` returns the saved choice and the live status. The password is not included; `hasPassword` says whether one is stored.
+- `PUT /api/v1/network` saves the choice, joins that network, and applies addressing. Omit `password` to keep the saved one. An empty `password` joins an open network. `ipv4.mode` is `dhcp` or `static`. Static requires `address`, a dotted `netmask`, `gateway`, and `dns`.
+- `GET /api/v1/network/status` is the live association and addresses, for the UI to poll after `PUT`.
+
+```json
+{
+  "ssid": "Office",
+  "password": "correct horse",
+  "ipv4": {
+    "mode": "static",
+    "address": "192.168.1.50",
+    "netmask": "255.255.255.0",
+    "gateway": "192.168.1.1",
+    "dns": "8.8.8.8"
+  }
+}
+```
+
+A failed join still leaves `network.json` on the boot partition so the next boot retries. Until that file exists, boot uses `kioskbrowser.ini` (or a hand-written `wpa_supplicant.conf` on the boot partition) and DHCP.
+
+Dispenser identity (tag **Dispenser**):
+
+- `GET /api/v1/dispenser` returns `{"configured": false}` until one is saved.
+- `PUT /api/v1/dispenser` stores `{"dispenserId": "D-1042", "name": "Roma Termini"}`. `name` is optional.
+- `DELETE /api/v1/dispenser` removes it so the UI asks again.
+
+The UI should call `GET` at startup and `PUT` when the operator answers. Errors use `{"error": {"code", "severity", "message"}}`.
 
 ## Local webserver
 root-kiosk ships with an nginx webserver and a PHP runtime by default (which is used internally for the heartbeat mechanism).  

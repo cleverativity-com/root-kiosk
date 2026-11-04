@@ -1,0 +1,13 @@
+#!/bin/bash
+# Start the local settings API on localhost.
+set -euo pipefail
+
+export PYTHONDONTWRITEBYTECODE=1
+export PYTHONPYCACHEPREFIX="${PYTHONPYCACHEPREFIX:-/tmp/kiosk-settings-pycache}"
+export PYTHONPATH="/opt/kiosk-settings${PYTHONPATH:+:$PYTHONPATH}"
+mkdir -p "${PYTHONPYCACHEPREFIX}"
+
+HOST="${KIOSK_HOST:-127.0.0.1}"
+PORT="${KIOSK_PORT:-8766}"
+
+exec /usr/bin/python3 -m uvicorn kiosk_settings.main:app --host "${HOST}" --port "${PORT}"
