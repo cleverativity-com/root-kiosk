@@ -134,7 +134,28 @@ class TbwRootApiTests(unittest.TestCase):
         self.assertIn("TBW_HARDWARE_MODE=gpio", service)
         self.assertNotIn("TBW_HARDWARE_MODE=sim", service)
         self.assertIn("TBW_HARDWARE=gpio", service)
+        self.assertIn("EnvironmentFile=/etc/tbw-root-api/.env", service)
         self.assertIn("SupplementaryGroups=gpio", service)
+        dotenv = (ROOT / "kiosk_skeleton" / "etc" / "tbw-root-api" / ".env").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("TBW_HARDWARE=gpio", dotenv)
+        self.assertIn("TBW_HARDWARE_MODE=gpio", dotenv)
+        assignments = [
+            line.split("=", 1)[1]
+            for line in dotenv.splitlines()
+            if line.startswith("TBW_HARDWARE")
+        ]
+        self.assertEqual(assignments, ["gpio", "gpio"])
+        launcher = (ROOT / "kiosk_skeleton" / "usr" / "bin" / "tbw-root-api").read_text(
+            encoding="utf-8"
+        )
+        self.assertLess(launcher.index("app.env"), launcher.index("/etc/tbw-root-api/.env"))
+        install = (ROOT / "kiosk_skeleton" / "usr" / "lib" / "tbw" / "install-tbw.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("gpio_env.py --normalize-tree", install)
+        self.assertIn("gpio_env.py --write /etc/tbw-root-api/.env", install)
         build = (ROOT / "kiosk_skeleton" / "build.sh").read_text(encoding="utf-8")
         self.assertIn("python3-gpiozero", build)
         self.assertIn("python3-lgpio", build)
@@ -293,6 +314,71 @@ class GpioJobTests(unittest.TestCase):
         self.assertEqual(job.status, "completed")
         self.assertEqual(job.completed_shots[0], 1)
         self.assertEqual(machine.pumps[0].remaining_shots, 9)
+
+
+class HardwareEnvTests(unittest.TestCase):
+    def test_simulation_dotenv_is_rewritten_to_gpio(self) -> None:
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "gpio_env",
+            ROOT / "kiosk_skeleton" / "usr" / "lib" / "tbw" / "gpio_env.py",
+        )
+        self.assertIsNotNone(spec)
+        self.assertIsNotNone(spec.loader)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        updated = module.normalize_text(
+            'export TBW_HARDWARE="simulation"\nTBW_PORT=8765\n# keep\n',
+            ensure=True,
+        )
+        self.assertIn("TBW_HARDWARE=gpio\n", updated)
+        self.assertIn("TBW_HARDWARE_MODE=gpio\n", updated)
+        self.assertIn("TBW_PORT=8765\n", updated)
+        self.assertIn("# keep\n", updated)
+        self.assertNotIn("simulation", updated)
+
+        root = Path(tempfile.mkdtemp(prefix="tbw-env-"))
+        api = root / "services" / "tbw-root-api"
+        api.mkdir(parents=True)
+        (api / ".env").write_text("TBW_HARDWARE=sim\n", encoding="utf-8")
+        (api / ".env.example").write_text("TBW_HARDWARE=sim\n", encoding="utf-8")
+        venv_env = api / "venv" / ".env"
+        venv_env.parent.mkdir()
+        venv_env.write_text("TBW_HARDWARE=sim\n", encoding="utf-8")
+        changed = module.normalize_tree(api)
+        self.assertEqual((api / ".env").read_text(encoding="utf-8"), "TBW_HARDWARE=gpio\nTBW_HARDWARE_MODE=gpio\n")
+        self.assertEqual((api / ".env.example").read_text(encoding="utf-8"), "TBW_HARDWARE=sim\n")
+        self.assertEqual(venv_env.read_text(encoding="utf-8"), "TBW_HARDWARE=sim\n")
+        self.assertEqual(changed, [api / ".env"])
+
+    def test_tbw_hardware_gpio_and_kiosk_dotenv(self) -> None:
+        import tbw_root_api.machine as machine_mod
+
+        previous_files = machine_mod.KIOSK_ENV_FILES
+        saved = {
+            key: os.environ.get(key)
+            for key in ("TBW_HARDWARE", "TBW_HARDWARE_MODE")
+        }
+        env_path = Path(tempfile.mkdtemp(prefix="tbw-kiosk-env-")) / ".env"
+        env_path.write_text("TBW_HARDWARE=gpio\n", encoding="utf-8")
+        machine_mod.KIOSK_ENV_FILES = (env_path,)
+        for key in saved:
+            os.environ.pop(key, None)
+        try:
+            fresh = machine_mod.Machine()
+            self.assertEqual(fresh.hardware_mode, "gpio")
+            self.assertIsNone(fresh.pump_driver)
+            os.environ["TBW_HARDWARE_MODE"] = "sim"
+            simulated = machine_mod.Machine()
+            self.assertEqual(simulated.hardware_mode, "sim")
+        finally:
+            machine_mod.KIOSK_ENV_FILES = previous_files
+            for key, value in saved.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
 
 
 if __name__ == "__main__":

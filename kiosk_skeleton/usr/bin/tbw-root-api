@@ -6,13 +6,17 @@ export PYTHONDONTWRITEBYTECODE=1
 export PYTHONPYCACHEPREFIX="${PYTHONPYCACHEPREFIX:-/tmp/tbw-pycache}"
 mkdir -p "${PYTHONPYCACHEPREFIX}" /var/lib/tbw-root-api || true
 
-if [ -f /etc/tbw-root-api/app.env ]; then
-	# shellcheck disable=SC1091
-	set -a
-	# shellcheck source=/dev/null
-	. /etc/tbw-root-api/app.env
-	set +a
-fi
+# app.env may name the uvicorn app. .env is sourced last so TBW_HARDWARE=gpio
+# wins over a sim value copied from an upstream env file.
+for envfile in /etc/tbw-root-api/app.env /etc/tbw-root-api/.env; do
+	if [ -f "${envfile}" ]; then
+		# shellcheck disable=SC1091
+		set -a
+		# shellcheck source=/dev/null
+		. "${envfile}"
+		set +a
+	fi
+done
 
 APP="${TBW_UVICORN_APP:-tbw_root_api.main:app}"
 HOST="${TBW_HOST:-127.0.0.1}"

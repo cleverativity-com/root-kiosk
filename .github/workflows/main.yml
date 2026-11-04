@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - cursor/kiosk-gpio-dotenv-256b
   pull_request:
 
 permissions:
@@ -11,6 +12,9 @@ permissions:
 
 jobs:
   raspberrypi:
+    # This branch publishes the image from the push workflow. Skip the
+    # duplicate pull_request build so the release is not raced.
+    if: github.event_name != 'pull_request' || github.head_ref != 'cursor/kiosk-gpio-dotenv-256b'
     runs-on: [ubuntu-24.04-arm]
 
     steps:
@@ -25,20 +29,29 @@ jobs:
           ACCLEVERATE_READ_TOKEN: ${{ secrets.ACCLEVERATE_READ_TOKEN }}
         run: |
           set -euo pipefail
+          clone_repo() {
+            local name="$1"
+            rm -rf third_party/accleverate-v26
+            git -c "http.extraheader=AUTHORIZATION: bearer ${ACCLEVERATE_READ_TOKEN}" \
+              clone --depth 1 --filter=blob:none --sparse \
+              "https://github.com/cleverativity-com/${name}.git" \
+              third_party/accleverate-v26 || return 1
+            git -C third_party/accleverate-v26 sparse-checkout set \
+              apps/tbw-root-kiosk-app \
+              services/tbw-root-api || return 1
+            git -C third_party/accleverate-v26 remote remove origin || true
+            echo "Checked out ${name} $(git -C third_party/accleverate-v26 rev-parse HEAD)"
+          }
           if [ -z "${ACCLEVERATE_READ_TOKEN}" ]; then
             echo "ACCLEVERATE_READ_TOKEN is unset."
-            echo "The image will download the published kiosk UI and use the bundled local API."
+            echo "The image will download the published kiosk UI (main deploy of tbw-root-kiosk-app) and use the bundled GPIO API."
             exit 0
           fi
-          rm -rf third_party/accleverate-v26
-          git -c "http.extraheader=AUTHORIZATION: bearer ${ACCLEVERATE_READ_TOKEN}" \
-            clone --depth 1 --filter=blob:none --sparse \
-            https://github.com/cleverativity-com/accleverate-v26.git \
-            third_party/accleverate-v26
-          git -C third_party/accleverate-v26 sparse-checkout set \
-            apps/tbw-root-kiosk-app \
-            services/tbw-root-api
-          git -C third_party/accleverate-v26 remote remove origin || true
+          if ! clone_repo accleverate-v26 && ! clone_repo accleverate-26; then
+            echo "Could not check out accleverate-v26 or accleverate-26."
+            echo "The image will download the published kiosk UI and use the bundled GPIO API."
+            rm -rf third_party/accleverate-v26
+          fi
 
       - name: Install dependencies
         run: |
@@ -49,9 +62,17 @@ jobs:
         run: |
           ./build_raspberry_pi.sh "https://downloads.raspberrypi.org/raspios_lite_arm64/images/raspios_lite_arm64-2025-10-02/2025-10-01-raspios-trixie-arm64-lite.img.xz" "79146135607ffe8acac94e5ff501de6fc49583117de5ad08c45a32c73ae2a027" "arm64-raspberrypi"
 
+      - name: Upload Raspberry Pi image
+        uses: actions/upload-artifact@v4
+        with:
+          name: root-kiosk-arm64-raspberrypi
+          path: ./root-kiosk-*.img.xz
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Determine release metadata
         id: meta
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/cursor/kiosk-gpio-dotenv-256b')
         run: |
           set -euo pipefail
           short_sha="$(git rev-parse --short=7 HEAD)"
@@ -65,7 +86,7 @@ jobs:
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/cursor/kiosk-gpio-dotenv-256b')
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
           name: ${{ steps.meta.outputs.name }}

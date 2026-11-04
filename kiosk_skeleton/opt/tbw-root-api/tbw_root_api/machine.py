@@ -2,8 +2,9 @@
 
 The kiosk UI talks to this process on /api/v1. The image runs this
 service when services/tbw-root-api from accleverate-v26 is not installed.
-TBW_HARDWARE_MODE=gpio pulses the stepper pumps. TBW_HARDWARE_MODE=sim
-only advances the job, which is what the unit tests use.
+TBW_HARDWARE or TBW_HARDWARE_MODE of gpio pulses the stepper pumps.
+sim (also simulation / simulated) only advances the job, which is what
+the unit tests use. The kiosk file /etc/tbw-root-api/.env sets gpio.
 """
 
 from __future__ import annotations
@@ -123,6 +124,79 @@ def _env_float(name: str, default: float) -> float:
     return float(raw)
 
 
+# Later files win. .env is the kiosk setting and overrides app.env.
+KIOSK_ENV_FILES = (
+    Path("/etc/tbw-root-api/app.env"),
+    Path("/etc/tbw-root-api/.env"),
+    Path("/opt/tbw-root-api/.env"),
+)
+_SIM_VALUES = {"sim", "simulation", "simulated", "mock", "fake"}
+_HARDWARE_ENV_KEYS = ("TBW_HARDWARE_MODE", "TBW_HARDWARE")
+
+
+def _parse_env_assignments(text: str) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for raw in text.splitlines():
+        stripped = raw.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if stripped.startswith("export "):
+            stripped = stripped[len("export ") :].strip()
+        if "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+            value = value[1:-1]
+        if key:
+            values[key] = value
+    return values
+
+
+def _canonical_hardware_mode(raw: str | None) -> str | None:
+    if raw is None:
+        return None
+    value = raw.strip().lower()
+    if not value:
+        return None
+    if value == "gpio":
+        return "gpio"
+    if value in _SIM_VALUES:
+        return "sim"
+    return None
+
+
+def _apply_kiosk_env_files() -> None:
+    """Use /etc/tbw-root-api/.env when the process did not set a mode.
+
+    The launcher and systemd already export gpio. Filling only missing keys
+    keeps an explicit sim (the unit tests) from being overwritten.
+    """
+    merged: dict[str, str] = {}
+    for path in KIOSK_ENV_FILES:
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        merged.update(_parse_env_assignments(text))
+    for key in _HARDWARE_ENV_KEYS:
+        current = os.environ.get(key)
+        if current is not None and current.strip() != "":
+            continue
+        if key in merged:
+            os.environ[key] = merged[key]
+
+
+def _hardware_mode_from_env() -> str:
+    _apply_kiosk_env_files()
+    for name in _HARDWARE_ENV_KEYS:
+        mode = _canonical_hardware_mode(os.environ.get(name))
+        if mode is not None:
+            return mode
+    return "sim"
+
+
 class Machine:
     def __init__(self) -> None:
         self.state_dir = Path(os.environ.get("TBW_STATE_DIR", "/var/lib/tbw-root-api"))
@@ -133,8 +207,7 @@ class Machine:
         self.shot_seconds = _env_float("TBW_SHOT_SECONDS", 0.8)
         self.initial_shots = _env_int("TBW_INITIAL_SHOTS", 100)
         self.port = _env_int("TBW_PORT", 8765)
-        raw_mode = os.environ.get("TBW_HARDWARE_MODE", "sim").strip().lower()
-        self.hardware_mode = raw_mode if raw_mode in {"gpio", "sim"} else "sim"
+        self.hardware_mode = _hardware_mode_from_env()
         self.pump_driver = None
         self.gpio_error: str | None = None
         self.config = self._load_config()
