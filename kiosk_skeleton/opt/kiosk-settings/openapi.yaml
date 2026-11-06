@@ -1,0 +1,447 @@
+openapi: 3.1.0
+info:
+  title: Kiosk settings
+  description: Wi-Fi, IPv4 addressing, and dispenser identity. Settings are stored
+    on the boot partition. The root filesystem stays read-only.
+  version: 1.0.0
+paths:
+  /api/v1/network/wifi:
+    get:
+      tags:
+      - Network
+      summary: Wifi Scan
+      operationId: wifi_scan_api_v1_network_wifi_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WifiScanBody'
+  /api/v1/network/status:
+    get:
+      tags:
+      - Network
+      summary: Network Status
+      operationId: network_status_api_v1_network_status_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusBody'
+  /api/v1/network:
+    get:
+      tags:
+      - Network
+      summary: Get Network
+      operationId: get_network_api_v1_network_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkBody'
+    put:
+      tags:
+      - Network
+      summary: Put Network
+      operationId: put_network_api_v1_network_put
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NetworkPut'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NetworkUpdateBody'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/dispenser:
+    get:
+      tags:
+      - Dispenser
+      summary: Get Dispenser
+      operationId: get_dispenser_api_v1_dispenser_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DispenserBody'
+    put:
+      tags:
+      - Dispenser
+      summary: Put Dispenser
+      operationId: put_dispenser_api_v1_dispenser_put
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DispenserPut'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DispenserBody'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - Dispenser
+      summary: Delete Dispenser
+      operationId: delete_dispenser_api_v1_dispenser_delete
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DispenserBody'
+components:
+  schemas:
+    DispenserBody:
+      properties:
+        configured:
+          type: boolean
+          title: Configured
+        dispenserId:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Dispenserid
+        name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Name
+        updatedAt:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Updatedat
+      type: object
+      required:
+      - configured
+      title: DispenserBody
+    DispenserPut:
+      properties:
+        dispenserId:
+          type: string
+          maxLength: 64
+          minLength: 1
+          title: Dispenserid
+        name:
+          anyOf:
+          - type: string
+            maxLength: 128
+          - type: 'null'
+          title: Name
+      type: object
+      required:
+      - dispenserId
+      title: DispenserPut
+      examples:
+      - dispenserId: D-1042
+        name: Roma Termini
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    Ipv4Dhcp:
+      properties:
+        mode:
+          type: string
+          const: dhcp
+          title: Mode
+      type: object
+      required:
+      - mode
+      title: Ipv4Dhcp
+    Ipv4Public:
+      properties:
+        mode:
+          type: string
+          enum:
+          - dhcp
+          - static
+          title: Mode
+        address:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Address
+        netmask:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Netmask
+        gateway:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Gateway
+        dns:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Dns
+      type: object
+      required:
+      - mode
+      title: Ipv4Public
+    Ipv4Static:
+      properties:
+        mode:
+          type: string
+          const: static
+          title: Mode
+        address:
+          type: string
+          title: Address
+        netmask:
+          type: string
+          title: Netmask
+        gateway:
+          type: string
+          title: Gateway
+        dns:
+          type: string
+          title: Dns
+      type: object
+      required:
+      - mode
+      - address
+      - netmask
+      - gateway
+      - dns
+      title: Ipv4Static
+    NetworkBody:
+      properties:
+        ssid:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Ssid
+        hasPassword:
+          type: boolean
+          title: Haspassword
+        ipv4:
+          $ref: '#/components/schemas/Ipv4Public'
+        status:
+          $ref: '#/components/schemas/StatusBody'
+      type: object
+      required:
+      - ssid
+      - hasPassword
+      - ipv4
+      - status
+      title: NetworkBody
+    NetworkPut:
+      properties:
+        ssid:
+          type: string
+          maxLength: 32
+          minLength: 1
+          title: Ssid
+        password:
+          anyOf:
+          - type: string
+            maxLength: 63
+          - type: 'null'
+          title: Password
+          description: Omit to keep the saved password. An empty string joins an open
+            network.
+        ipv4:
+          oneOf:
+          - $ref: '#/components/schemas/Ipv4Dhcp'
+          - $ref: '#/components/schemas/Ipv4Static'
+          title: Ipv4
+          discriminator:
+            propertyName: mode
+            mapping:
+              dhcp: '#/components/schemas/Ipv4Dhcp'
+              static: '#/components/schemas/Ipv4Static'
+      type: object
+      required:
+      - ssid
+      - ipv4
+      title: NetworkPut
+      examples:
+      - ipv4:
+          mode: dhcp
+        password: correct horse
+        ssid: Office
+      - ipv4:
+          address: 192.168.1.50
+          dns: 8.8.8.8
+          gateway: 192.168.1.1
+          mode: static
+          netmask: 255.255.255.0
+        password: correct horse
+        ssid: Office
+    NetworkUpdateBody:
+      properties:
+        ssid:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Ssid
+        hasPassword:
+          type: boolean
+          title: Haspassword
+        ipv4:
+          $ref: '#/components/schemas/Ipv4Public'
+        status:
+          $ref: '#/components/schemas/StatusBody'
+        saved:
+          type: boolean
+          title: Saved
+        associated:
+          type: boolean
+          title: Associated
+        addressing:
+          type: boolean
+          title: Addressing
+        detail:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Detail
+      type: object
+      required:
+      - ssid
+      - hasPassword
+      - ipv4
+      - status
+      - saved
+      - associated
+      - addressing
+      title: NetworkUpdateBody
+    StatusBody:
+      properties:
+        connected:
+          type: boolean
+          title: Connected
+        ssid:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Ssid
+        address:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Address
+        netmask:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Netmask
+        gateway:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Gateway
+        dns:
+          items:
+            type: string
+          type: array
+          title: Dns
+      type: object
+      required:
+      - connected
+      title: StatusBody
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+        input:
+          title: Input
+        ctx:
+          type: object
+          title: Context
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+    WifiNetwork:
+      properties:
+        ssid:
+          type: string
+          title: Ssid
+        bssid:
+          type: string
+          title: Bssid
+        signal:
+          type: integer
+          title: Signal
+          description: Signal strength in dBm. Closer to zero is stronger.
+        frequency:
+          type: integer
+          title: Frequency
+        security:
+          type: string
+          title: Security
+          description: open, wpa-psk, wpa3, or wep
+      type: object
+      required:
+      - ssid
+      - bssid
+      - signal
+      - frequency
+      - security
+      title: WifiNetwork
+    WifiScanBody:
+      properties:
+        networks:
+          items:
+            $ref: '#/components/schemas/WifiNetwork'
+          type: array
+          title: Networks
+      type: object
+      required:
+      - networks
+      title: WifiScanBody
+servers:
+- url: http://127.0.0.1
+  description: Kiosk nginx, same origin as the UI
+- url: http://127.0.0.1:8766
+  description: kiosk-settings process
