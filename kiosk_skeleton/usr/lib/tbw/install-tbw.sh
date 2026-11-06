@@ -60,15 +60,32 @@ install_upstream_api() {
 	return 0
 }
 
+append_repo_identity() {
+	local pkg="${SRC}/apps/tbw-root-kiosk-app/package.json"
+	if [ -f "${pkg}" ]; then
+		python3 - "${pkg}" <<'PY'
+import json, sys
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+name = data.get("name") or ""
+version = data.get("version")
+if name:
+    print(f"app_name={name}")
+if isinstance(version, str) and version:
+    print(f"app_version={version}")
+PY
+	fi
+	if [ -d "${SRC}/.git" ] && command -v git >/dev/null 2>&1; then
+		printf 'git_revision=%s\n' "$(git -C "${SRC}" rev-parse HEAD)"
+		git -C "${SRC}" log -1 --format='git_subject=%s'
+	fi
+}
+
 write_ui_source() {
 	mkdir -p /etc/tbw-root-api
 	{
 		printf 'kiosk_ui=%s\n' "$1"
 		printf 'recorded_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-		if [ -d "${SRC}/.git" ] && command -v git >/dev/null 2>&1; then
-			printf 'git_revision=%s\n' "$(git -C "${SRC}" rev-parse HEAD)"
-			git -C "${SRC}" log -1 --format='git_subject=%s'
-		fi
+		append_repo_identity
 	} > /etc/tbw-root-api/kiosk-ui-source
 }
 
@@ -83,6 +100,11 @@ download_published_ui() {
 		printf 'last_modified=%s\n' "${last_modified}"
 		printf 'etag=%s\n' "${etag}"
 		printf 'recorded_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+		if [ -d "${SRC}" ]; then
+			append_repo_identity
+		else
+			printf '%s\n' "repo_checkout=not-present"
+		fi
 	} > /etc/tbw-root-api/kiosk-ui-source
 }
 

@@ -9,7 +9,7 @@ Defaults baked into `/boot/firmware`:
 - Hardware API: `tbw-root-api` on `127.0.0.1:8765`, reached by the UI through nginx at `/api/v1`
 - Settings API: `kiosk-settings` on `127.0.0.1:8766` (Wi-Fi, IPv4, and dispenser identity). Swagger at `http://127.0.0.1/settings/docs`
 - Splash screen: Root SNC logo (`splash.png`)
-- Keyboard layout: Italian (`it`) plus an on-screen keyboard (onboard) that appears only while a text field is focused
+- Keyboard layout: Italian (`it`); no on-screen keyboard, Chromium stays fullscreen
 - Screen never blanks
 - WiFi: `CleverWiFi` and `CleverWiFiX`
 - OpenVPN client (`openvpn.ovpn`); SSH (22) and VNC (5900) are firewalled so they are **only reachable from the VPN**
