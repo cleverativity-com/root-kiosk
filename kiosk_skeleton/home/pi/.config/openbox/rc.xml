@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Kiosk window rules for the pi session. This file replaces the packaged
+  Openbox configuration. Chromium is mapped fullscreen, with no decorations.
+  The keyboard and mouse sections are empty so the window manager has no
+  shortcut or drag gesture that closes, moves, resizes, or un-fullscreens
+  the browser. Keys and clicks still reach the page.
+-->
+<openbox_config xmlns="http://openbox.org/3.4/rc">
+  <focus>
+    <focusNew>yes</focusNew>
+  </focus>
+  <desktops>
+    <number>1</number>
+  </desktops>
+  <keyboard>
+  </keyboard>
+  <mouse>
+  </mouse>
+  <applications>
+    <application class="Chromium*">
+      <decor>no</decor>
+      <fullscreen>yes</fullscreen>
+      <maximized>yes</maximized>
+      <layer>above</layer>
+    </application>
+    <application class="chromium*">
+      <decor>no</decor>
+      <fullscreen>yes</fullscreen>
+      <maximized>yes</maximized>
+      <layer>above</layer>
+    </application>
+    <application name="chromium*">
+      <decor>no</decor>
+      <fullscreen>yes</fullscreen>
+      <maximized>yes</maximized>
+      <layer>above</layer>
+    </application>
+    <application name="Chromium*">
+      <decor>no</decor>
+      <fullscreen>yes</fullscreen>
+      <maximized>yes</maximized>
+      <layer>above</layer>
+    </application>
+  </applications>
+</openbox_config>
