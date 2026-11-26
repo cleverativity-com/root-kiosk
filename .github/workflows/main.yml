@@ -29,16 +29,23 @@ jobs:
           ACCLEVERATE_READ_TOKEN: ${{ secrets.ACCLEVERATE_READ_TOKEN }}
         run: |
           set -euo pipefail
+          export GIT_TERMINAL_PROMPT=0
           clone_repo() {
             local name="$1"
             rm -rf third_party/accleverate-v26
-            git -c "http.extraheader=AUTHORIZATION: bearer ${ACCLEVERATE_READ_TOKEN}" \
+            # Token stays in the remote URL only until origin is removed. Do not echo that URL.
+            git -c credential.helper= \
               clone --depth 1 --filter=blob:none --sparse \
-              "https://github.com/cleverativity-com/${name}.git" \
+              "https://x-access-token:${ACCLEVERATE_READ_TOKEN}@github.com/cleverativity-com/${name}.git" \
               third_party/accleverate-v26 || return 1
-            git -C third_party/accleverate-v26 sparse-checkout set \
+            git -c credential.helper= -C third_party/accleverate-v26 sparse-checkout set \
               apps/tbw-root-kiosk-app \
               services/tbw-root-api || return 1
+            if [ ! -d third_party/accleverate-v26/apps/tbw-root-kiosk-app ] \
+              || [ ! -d third_party/accleverate-v26/services/tbw-root-api ]; then
+              echo "Sparse checkout of ${name} is missing the kiosk app or the API."
+              return 1
+            fi
             git -C third_party/accleverate-v26 remote remove origin || true
             echo "Checked out ${name} $(git -C third_party/accleverate-v26 rev-parse HEAD)"
           }
@@ -49,8 +56,8 @@ jobs:
           fi
           if ! clone_repo accleverate-v26 && ! clone_repo accleverate-26; then
             echo "Could not check out accleverate-v26 or accleverate-26."
-            echo "The image will download the published kiosk UI and use the bundled GPIO API."
             rm -rf third_party/accleverate-v26
+            exit 1
           fi
 
       - name: Install dependencies
