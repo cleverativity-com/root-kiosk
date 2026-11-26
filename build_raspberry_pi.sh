@@ -69,7 +69,7 @@ sudo rsync -a "${SCRIPT_DIR}/kiosk_skeleton/." "${BUILD_DIR}/kiosk_skeleton" || 
 # Optional accleverate checkout (apps/tbw-root-kiosk-app and services/tbw-root-api).
 if [ -d "${SCRIPT_DIR}/third_party/accleverate-v26" ]; then
 	sudo mkdir -p "${BUILD_DIR}/opt/src"
-	sudo rsync -a "${SCRIPT_DIR}/third_party/accleverate-v26" "${BUILD_DIR}/opt/src/accleverate-v26"
+	sudo rsync -a "${SCRIPT_DIR}/third_party/accleverate-v26/" "${BUILD_DIR}/opt/src/accleverate-v26"
 fi
 
 # Use the Raspberry Pi 5 (arm64) config.txt
