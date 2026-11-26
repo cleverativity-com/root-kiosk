@@ -1,0 +1,32 @@
+#!/bin/bash
+# Keep the Chromium window covering this X display until the session ends.
+#
+# Chromium is launched with --kiosk --start-fullscreen, and Openbox maps it
+# undecorated and fullscreen. A later display mode change, or the screen
+# waking, can leave the window at the old size or out of fullscreen. Adding
+# fullscreen is a no-op while the window is already fullscreen. When the size
+# no longer matches the display, drop fullscreen once so the window manager
+# applies it again at the current size.
+
+if [ -z "${DISPLAY}" ]; then
+	exit 0
+fi
+
+while true; do
+	WINS=$(xdotool search --onlyvisible --class '[Cc]hromium' 2>/dev/null || true)
+	for WIN in ${WINS}; do
+		read -r DISP_W DISP_H <<EOF
+$(xdotool getdisplaygeometry 2>/dev/null || true)
+EOF
+		GEOM=$(xdotool getwindowgeometry --shell "${WIN}" 2>/dev/null || true)
+		WIDTH=$(printf '%s\n' "${GEOM}" | awk -F= '/^WIDTH=/{print $2}')
+		HEIGHT=$(printf '%s\n' "${GEOM}" | awk -F= '/^HEIGHT=/{print $2}')
+		if [ -n "${DISP_W}" ] && [ -n "${DISP_H}" ] && [ -n "${WIDTH}" ] && [ -n "${HEIGHT}" ] \
+			&& { [ "${WIDTH}" != "${DISP_W}" ] || [ "${HEIGHT}" != "${DISP_H}" ]; }
+		then
+			wmctrl -i -r "${WIN}" -b remove,fullscreen >/dev/null 2>&1 || true
+		fi
+		wmctrl -i -r "${WIN}" -b add,fullscreen >/dev/null 2>&1 || true
+	done
+	sleep 2
+done
