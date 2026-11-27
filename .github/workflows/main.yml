@@ -37,25 +37,36 @@ jobs:
           export GIT_TERMINAL_PROMPT=0
           clone_repo() {
             local name="$1"
-            rm -rf third_party/accleverate-v26
-            # The token stays in the request header, not the remote URL, so a
-            # failed clone does not print it.
-            git -c credential.helper= \
-              -c http.extraheader="AUTHORIZATION: Bearer ${ACCLEVERATE_READ_TOKEN}" \
-              clone --depth 1 \
-              "https://github.com/cleverativity-com/${name}.git" \
-              third_party/accleverate-v26 || return 1
-            if [ ! -d third_party/accleverate-v26/apps/tbw-root-kiosk-app ] \
-              || [ ! -d third_party/accleverate-v26/services/tbw-root-api ]; then
-              echo "Checkout of ${name} is missing the kiosk app or the API."
+            local dest="third_party/accleverate-v26"
+            local basic
+            rm -rf "${dest}"
+            mkdir -p "${dest}"
+            # Same header actions/checkout uses. A generic http.extraheader
+            # from -c is not sent, so Git asks for a username and the clone dies.
+            basic="$(printf 'x-access-token:%s' "${ACCLEVERATE_READ_TOKEN}" | base64 -w 0)"
+            git -C "${dest}" init -q
+            git -C "${dest}" remote add origin "https://github.com/cleverativity-com/${name}.git"
+            git -C "${dest}" config "http.https://github.com/.extraheader" "AUTHORIZATION: basic ${basic}"
+            unset basic
+            if ! git -C "${dest}" fetch --depth 1 origin HEAD; then
+              git -C "${dest}" config --unset-all "http.https://github.com/.extraheader" || true
+              rm -rf "${dest}"
               return 1
             fi
-            git -C third_party/accleverate-v26 remote remove origin || true
+            git -C "${dest}" checkout -q FETCH_HEAD
+            git -C "${dest}" config --unset-all "http.https://github.com/.extraheader" || true
+            git -C "${dest}" remote remove origin || true
+            if [ ! -d "${dest}/apps/tbw-root-kiosk-app" ] \
+              || [ ! -d "${dest}/services/tbw-root-api" ]; then
+              echo "Checkout of ${name} is missing the kiosk app or the API."
+              rm -rf "${dest}"
+              return 1
+            fi
             local rev subject
-            rev="$(git -C third_party/accleverate-v26 rev-parse HEAD)"
-            subject="$(git -C third_party/accleverate-v26 log -1 --format=%s)"
-            printf '%s\n' "${rev}" > third_party/accleverate-v26/.kiosk-revision
-            printf '%s\n' "${subject}" > third_party/accleverate-v26/.kiosk-subject
+            rev="$(git -C "${dest}" rev-parse HEAD)"
+            subject="$(git -C "${dest}" log -1 --format=%s)"
+            printf '%s\n' "${rev}" > "${dest}/.kiosk-revision"
+            printf '%s\n' "${subject}" > "${dest}/.kiosk-subject"
             echo "Checked out ${name} ${rev}"
             echo "Subject: ${subject}"
           }
