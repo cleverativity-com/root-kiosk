@@ -5,16 +5,21 @@ on:
     branches:
       - main
       - cursor/kiosk-gpio-dotenv-256b
+      - cursor/kiosk-api-stay-up-9028
   pull_request:
 
 permissions:
   contents: write
 
+concurrency:
+  group: image-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   raspberrypi:
     # This branch publishes the image from the push workflow. Skip the
     # duplicate pull_request build so the release is not raced.
-    if: github.event_name != 'pull_request' || github.head_ref != 'cursor/kiosk-gpio-dotenv-256b'
+    if: github.event_name != 'pull_request' || (github.head_ref != 'cursor/kiosk-gpio-dotenv-256b' && github.head_ref != 'cursor/kiosk-api-stay-up-9028')
     runs-on: [ubuntu-24.04-arm]
 
     steps:
@@ -32,33 +37,89 @@ jobs:
           export GIT_TERMINAL_PROMPT=0
           clone_repo() {
             local name="$1"
-            rm -rf third_party/accleverate-v26
-            # Token stays in the remote URL only until origin is removed. Do not echo that URL.
-            git -c credential.helper= \
-              clone --depth 1 --filter=blob:none --sparse \
-              "https://x-access-token:${ACCLEVERATE_READ_TOKEN}@github.com/cleverativity-com/${name}.git" \
-              third_party/accleverate-v26 || return 1
-            git -c credential.helper= -C third_party/accleverate-v26 sparse-checkout set \
-              apps/tbw-root-kiosk-app \
-              services/tbw-root-api || return 1
-            if [ ! -d third_party/accleverate-v26/apps/tbw-root-kiosk-app ] \
-              || [ ! -d third_party/accleverate-v26/services/tbw-root-api ]; then
-              echo "Sparse checkout of ${name} is missing the kiosk app or the API."
+            local dest="third_party/accleverate-v26"
+            local basic
+            rm -rf "${dest}"
+            mkdir -p "${dest}"
+            # Same header actions/checkout uses. A generic http.extraheader
+            # from -c is not sent, so Git asks for a username and the clone dies.
+            basic="$(printf 'x-access-token:%s' "${ACCLEVERATE_READ_TOKEN}" | base64 -w 0)"
+            git -C "${dest}" init -q
+            git -C "${dest}" remote add origin "https://github.com/cleverativity-com/${name}.git"
+            git -C "${dest}" config "http.https://github.com/.extraheader" "AUTHORIZATION: basic ${basic}"
+            unset basic
+            if ! git -C "${dest}" fetch --depth 1 origin HEAD; then
+              git -C "${dest}" config --unset-all "http.https://github.com/.extraheader" || true
+              rm -rf "${dest}"
               return 1
             fi
-            git -C third_party/accleverate-v26 remote remove origin || true
-            echo "Checked out ${name} $(git -C third_party/accleverate-v26 rev-parse HEAD)"
+            git -C "${dest}" checkout -q FETCH_HEAD
+            git -C "${dest}" config --unset-all "http.https://github.com/.extraheader" || true
+            git -C "${dest}" remote remove origin || true
+            if [ ! -d "${dest}/apps/tbw-root-kiosk-app" ] \
+              || [ ! -d "${dest}/services/tbw-root-api" ]; then
+              echo "Checkout of ${name} is missing the kiosk app or the API."
+              rm -rf "${dest}"
+              return 1
+            fi
+            local rev subject
+            rev="$(git -C "${dest}" rev-parse HEAD)"
+            subject="$(git -C "${dest}" log -1 --format=%s)"
+            printf '%s\n' "${rev}" > "${dest}/.kiosk-revision"
+            printf '%s\n' "${subject}" > "${dest}/.kiosk-subject"
+            echo "Checked out ${name} ${rev}"
+            echo "Subject: ${subject}"
           }
           if [ -z "${ACCLEVERATE_READ_TOKEN}" ]; then
-            echo "ACCLEVERATE_READ_TOKEN is unset."
-            echo "The image will download the published kiosk UI (main deploy of tbw-root-kiosk-app) and use the bundled GPIO API."
-            exit 0
+            echo "ACCLEVERATE_READ_TOKEN is unset. Refusing to build an image from the previously published UI."
+            exit 1
           fi
           if ! clone_repo accleverate-v26 && ! clone_repo accleverate-26; then
             echo "Could not check out accleverate-v26 or accleverate-26."
             rm -rf third_party/accleverate-v26
             exit 1
           fi
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build tbw-root-kiosk-app
+        run: |
+          set -euo pipefail
+          cd third_party/accleverate-v26
+          export HUSKY=0
+          export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+          # Root postinstall links an unrelated package. Drop it so this install
+          # only prepares the kiosk app. Dependency build scripts still run.
+          node -e 'const fs=require("fs"); const p=JSON.parse(fs.readFileSync("package.json","utf8")); delete p.scripts.postinstall; delete p.scripts.prepare; fs.writeFileSync("package.json", JSON.stringify(p, null, 2)+"\n");'
+          # pngquant-bin ships an x86 binary. On this arm64 runner its postinstall
+          # then tries to compile and fails without libpng. The kiosk image does
+          # not optimize PNGs with pngquant, so do not build it. libpng-dev is
+          # installed in case another package still compiles against libpng.
+          node -e 'const fs=require("fs"); const p="pnpm-workspace.yaml"; let t=fs.readFileSync(p,"utf8"); if (!/pngquant-bin:\s*true/.test(t)) { console.error("pngquant-bin allowBuilds entry was not true"); process.exit(1); } fs.writeFileSync(p, t.replace(/pngquant-bin:\s*true/, "pngquant-bin: false"));'
+          sudo apt-get update -qq
+          sudo apt-get install -yqq libpng-dev
+          corepack enable
+          corepack prepare pnpm@12.6.0 --activate
+          pnpm install --frozen-lockfile
+          pnpm --filter tbw-root-kiosk-app run build
+          test -f apps/tbw-root-kiosk-app/dist/spa/index.html
+          rev="$(tr -d "\r\n" < .kiosk-revision)"
+          subject="$(tr -d "\r\n" < .kiosk-subject)"
+          tmp="$(mktemp -d)"
+          mkdir -p "${tmp}/apps/tbw-root-kiosk-app" "${tmp}/services"
+          cp -a apps/tbw-root-kiosk-app/dist "${tmp}/apps/tbw-root-kiosk-app/dist"
+          cp -a apps/tbw-root-kiosk-app/package.json "${tmp}/apps/tbw-root-kiosk-app/package.json"
+          cp -a services/tbw-root-api "${tmp}/services/tbw-root-api"
+          rm -rf "${tmp}/services/tbw-root-api/.venv" "${tmp}/services/tbw-root-api/node_modules"
+          printf '%s\n' "${rev}" > "${tmp}/.kiosk-revision"
+          printf '%s\n' "${subject}" > "${tmp}/.kiosk-subject"
+          cd ..
+          rm -rf accleverate-v26
+          mv "${tmp}" accleverate-v26
+          echo "Built tbw-root-kiosk-app ${rev}"
 
       - name: Install dependencies
         run: |
@@ -79,7 +140,7 @@ jobs:
 
       - name: Determine release metadata
         id: meta
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/cursor/kiosk-gpio-dotenv-256b')
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/cursor/kiosk-gpio-dotenv-256b' || github.ref == 'refs/heads/cursor/kiosk-api-stay-up-9028')
         run: |
           set -euo pipefail
           short_sha="$(git rev-parse --short=7 HEAD)"
@@ -93,7 +154,7 @@ jobs:
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/cursor/kiosk-gpio-dotenv-256b')
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/cursor/kiosk-gpio-dotenv-256b' || github.ref == 'refs/heads/cursor/kiosk-api-stay-up-9028')
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
           name: ${{ steps.meta.outputs.name }}

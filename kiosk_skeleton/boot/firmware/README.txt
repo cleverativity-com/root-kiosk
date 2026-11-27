@@ -22,4 +22,4 @@ kiosk_admin / kiosk_admin.pub
     ssh -i kiosk_admin pi@<kiosk-vpn-ip>
 
 WiFi defaults: CleverWiFi and CleverWiFiX (same PSK).
-Keyboard: Italian (it). Screen never blanks. On-screen keyboard is shown.
+Keyboard: Italian (it). Screen never blanks. No on-screen keyboard. Chromium stays fullscreen.

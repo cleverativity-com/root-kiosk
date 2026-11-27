@@ -1,0 +1,14 @@
+[Unit]
+Description=Restart the TBW hardware API when port 8765 stops answering
+After=tbw-root-api.service nginx.service local-fs.target
+Wants=tbw-root-api.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/kiosk-api-hold
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

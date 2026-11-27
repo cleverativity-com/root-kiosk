@@ -54,7 +54,7 @@ install_upstream_api() {
 	printf 'TBW_UVICORN_APP=%s\n' "tbw_root_api.main:app" > /etc/tbw-root-api/app.env
 	# The venv does not see the system gpiozero package. The copy-only layout has no venv.
 	if [ -x /opt/tbw-root-api/venv/bin/pip ]; then
-		/opt/tbw-root-api/venv/bin/pip install --no-cache-dir gpiozero
+		/opt/tbw-root-api/venv/bin/pip install --no-cache-dir gpiozero uvicorn
 	fi
 	python3 /usr/lib/tbw/gpio_env.py --normalize-tree /opt/tbw-root-api
 	return 0
@@ -65,8 +65,14 @@ write_ui_source() {
 	{
 		printf 'kiosk_ui=%s\n' "$1"
 		printf 'recorded_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-		if [ -d "${SRC}/.git" ] && command -v git >/dev/null 2>&1; then
+		if [ -f "${SRC}/.kiosk-revision" ]; then
+			printf 'git_revision=%s\n' "$(tr -d '\r\n' < "${SRC}/.kiosk-revision")"
+		elif [ -d "${SRC}/.git" ] && command -v git >/dev/null 2>&1; then
 			printf 'git_revision=%s\n' "$(git -C "${SRC}" rev-parse HEAD)"
+		fi
+		if [ -f "${SRC}/.kiosk-subject" ]; then
+			printf 'git_subject=%s\n' "$(tr -d '\r\n' < "${SRC}/.kiosk-subject")"
+		elif [ -d "${SRC}/.git" ] && command -v git >/dev/null 2>&1; then
 			git -C "${SRC}" log -1 --format='git_subject=%s'
 		fi
 	} > /etc/tbw-root-api/kiosk-ui-source
@@ -116,13 +122,42 @@ if [ -d "${SRC}" ]; then
 		install_upstream_api
 	fi
 	if ! install_upstream_ui; then
-		echo "Upstream kiosk app has no dist/ build; downloading the published UI"
-		download_published_ui
+		echo "Upstream kiosk app has no dist/ build. Refusing the previously published UI." >&2
+		exit 1
 	fi
 	rm -rf "${SRC}"
 else
 	download_published_ui
 fi
+
+# The published UI draws its own QWERTY on the name step. That keyboard
+# covers the page. Chromium is already fullscreen, so hide the in-app keys
+# and stretch the document to the viewport.
+hide_onscreen_keyboard() {
+	local css="${WEB_ROOT}/kiosk-os-keyboard.css"
+	local index="${WEB_ROOT}/index.html"
+	cat > "${css}" <<'EOF'
+/* No on-screen keyboard. The name field stays; keys are not drawn. */
+.kiosk-qwerty-keyboard,
+.kiosk-step-name__keyboard {
+	display: none !important;
+}
+html,
+body,
+#q-app {
+	margin: 0;
+	width: 100%;
+	min-height: 100%;
+	min-height: 100dvh;
+	background: #fff8e8;
+}
+EOF
+	if [ -f "${index}" ] && ! grep -q 'kiosk-os-keyboard.css' "${index}"; then
+		sed -i 's#</head>#<link rel="stylesheet" href="/kiosk-os-keyboard.css"></head>#' "${index}"
+	fi
+}
+
+hide_onscreen_keyboard
 
 # The kiosk .env is gpio even when the upstream package shipped sim.
 python3 /usr/lib/tbw/gpio_env.py --write /etc/tbw-root-api/.env

@@ -42,5 +42,17 @@
       <maximized>yes</maximized>
       <layer>above</layer>
     </application>
+    <application class="chromium-browser">
+      <decor>no</decor>
+      <fullscreen>yes</fullscreen>
+      <maximized>yes</maximized>
+      <layer>above</layer>
+    </application>
+    <application class="Chromium-browser">
+      <decor>no</decor>
+      <fullscreen>yes</fullscreen>
+      <maximized>yes</maximized>
+      <layer>above</layer>
+    </application>
   </applications>
 </openbox_config>

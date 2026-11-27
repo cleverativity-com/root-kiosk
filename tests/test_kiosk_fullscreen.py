@@ -27,6 +27,13 @@ class KioskFullscreenTests(unittest.TestCase):
     def test_chromium_launches_in_kiosk_fullscreen(self) -> None:
         self.assertIn("--kiosk", self.autostart)
         self.assertIn("--start-fullscreen", self.autostart)
+        self.assertIn("--ozone-platform=x11", self.autostart)
+        self.assertIn("--window-position=0,0", self.autostart)
+        self.assertIn(
+            "--disable-features=Translate,TranslateUI,VirtualKeyboard",
+            self.autostart,
+        )
+        self.assertEqual(self.autostart.count("--disable-features="), 1)
         self.assertIn('"${URL}"', self.autostart)
         self.assertNotIn("--app=", self.autostart)
         self.assertNotIn("--start-maximized", self.autostart)
@@ -65,6 +72,7 @@ class KioskFullscreenTests(unittest.TestCase):
         matched = {rule.get("class") or rule.get("name") for rule in rules}
         self.assertIn("Chromium*", matched)
         self.assertIn("chromium*", matched)
+        self.assertIn("chromium-browser", matched)
         for rule in rules:
             self.assertEqual(rule.findtext("o:decor", default="", namespaces=OB_NS), "no")
             self.assertEqual(rule.findtext("o:fullscreen", default="", namespaces=OB_NS), "yes")
@@ -74,11 +82,24 @@ class KioskFullscreenTests(unittest.TestCase):
         self.assertIn("add,fullscreen", self.hold)
         self.assertIn("remove,fullscreen", self.hold)
         self.assertIn("getdisplaygeometry", self.hold)
+        self.assertIn("chromium-browser", self.hold)
         self.assertIn("while true", self.hold)
         self.assertIn("wmctrl", self.build)
+        install = (
+            ROOT / "kiosk_skeleton" / "usr" / "lib" / "tbw" / "install-tbw.sh"
+        ).read_text(encoding="utf-8")
+        self.assertIn("kiosk-qwerty-keyboard", install)
+        self.assertIn("kiosk-os-keyboard.css", install)
 
     def test_shell_scripts_parse(self) -> None:
-        for script in (AUTOSTART, HOLD, BUILD):
+        for script in (
+            AUTOSTART,
+            HOLD,
+            BUILD,
+            ROOT / "kiosk_skeleton" / "usr" / "bin" / "kiosk-api-hold",
+            ROOT / "kiosk_skeleton" / "usr" / "bin" / "tbw-root-api",
+            ROOT / "kiosk_skeleton" / "usr" / "lib" / "tbw" / "install-tbw.sh",
+        ):
             subprocess.run(["bash", "-n", str(script)], check=True)
 
 

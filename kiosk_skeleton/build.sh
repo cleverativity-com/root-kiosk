@@ -127,6 +127,7 @@ systemctl enable lightdm
 systemctl enable nginx
 systemctl enable kiosk-printer
 systemctl enable tbw-root-api
+systemctl enable kiosk-api-hold
 systemctl enable kiosk-settings
 systemctl enable ssh
 

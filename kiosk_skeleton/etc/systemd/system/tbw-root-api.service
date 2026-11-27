@@ -1,7 +1,11 @@
 [Unit]
 Description=TBW Root local hardware API
-After=network.target kiosk-printer.service
+After=local-fs.target network.target kiosk-printer.service
 Before=lightdm.service
+# A boot race (state directory not mounted yet, missing import) must not
+# leave the unit failed. nginx returns 502 for /api/v1 until this process
+# is listening again, and the default start limit stops restarting it.
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
@@ -10,6 +14,8 @@ Group=tbw
 WorkingDirectory=/var/lib/tbw-root-api
 Environment=TBW_HOST=127.0.0.1
 Environment=TBW_PORT=8765
+# Upstream services/tbw-root-api reads this name for its listen port.
+Environment=TBW_ROOT_API_PORT=8765
 # Bundled API. gpio pulses the steppers; sim marks the job finished without moving them.
 Environment=TBW_HARDWARE_MODE=gpio
 # Upstream services/tbw-root-api reads this name when that package replaces the bundled one.
@@ -20,7 +26,7 @@ Environment=TBW_STATE_DIR=/var/lib/tbw-root-api
 Environment=TBW_CONFIG=/etc/tbw-root-api/config_dosatore.json
 SupplementaryGroups=gpio
 ExecStart=/usr/bin/tbw-root-api
-Restart=on-failure
+Restart=always
 RestartSec=2
 
 [Install]

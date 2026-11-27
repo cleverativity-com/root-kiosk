@@ -136,6 +136,30 @@ class TbwRootApiTests(unittest.TestCase):
         self.assertIn("TBW_HARDWARE=gpio", service)
         self.assertIn("EnvironmentFile=/etc/tbw-root-api/.env", service)
         self.assertIn("SupplementaryGroups=gpio", service)
+        self.assertIn("Restart=always", service)
+        self.assertIn("StartLimitIntervalSec=0", service)
+        self.assertIn("TBW_ROOT_API_PORT=8765", service)
+        self.assertIn("local-fs.target", service)
+        hold = (ROOT / "kiosk_skeleton" / "usr" / "bin" / "kiosk-api-hold").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("/api/v1/machine/status", hold)
+        self.assertIn("reset-failed tbw-root-api.service", hold)
+        self.assertIn("start tbw-root-api.service", hold)
+        hold_unit = (
+            ROOT / "kiosk_skeleton" / "etc" / "systemd" / "system" / "kiosk-api-hold.service"
+        ).read_text(encoding="utf-8")
+        self.assertIn("WantedBy=multi-user.target", hold_unit)
+        wants = (
+            ROOT
+            / "kiosk_skeleton"
+            / "etc"
+            / "systemd"
+            / "system"
+            / "multi-user.target.wants"
+        )
+        self.assertTrue((wants / "tbw-root-api.service").is_symlink())
+        self.assertTrue((wants / "kiosk-api-hold.service").is_symlink())
         dotenv = (ROOT / "kiosk_skeleton" / "etc" / "tbw-root-api" / ".env").read_text(
             encoding="utf-8"
         )
@@ -151,12 +175,26 @@ class TbwRootApiTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertLess(launcher.index("app.env"), launcher.index("/etc/tbw-root-api/.env"))
+        self.assertIn("import uvicorn, tbw_root_api", launcher)
+        self.assertIn("/usr/bin/python3", launcher)
         install = (ROOT / "kiosk_skeleton" / "usr" / "lib" / "tbw" / "install-tbw.sh").read_text(
             encoding="utf-8"
         )
         self.assertIn("gpio_env.py --normalize-tree", install)
         self.assertIn("gpio_env.py --write /etc/tbw-root-api/.env", install)
+        self.assertIn(".kiosk-revision", install)
+        self.assertIn("Refusing the previously published UI.", install)
+        workflow = (ROOT / ".github" / "workflows" / "main.yml").read_text(encoding="utf-8")
+        self.assertIn("pnpm --filter tbw-root-kiosk-app run build", workflow)
+        self.assertIn("pngquant-bin: false", workflow)
+        self.assertIn("libpng-dev", workflow)
+        self.assertIn("ACCLEVERATE_READ_TOKEN is unset.", workflow)
+        self.assertIn("http.https://github.com/.extraheader", workflow)
+        self.assertIn("AUTHORIZATION: basic", workflow)
+        self.assertNotIn("x-access-token:${", workflow)
+        self.assertNotIn("@github.com", workflow)
         build = (ROOT / "kiosk_skeleton" / "build.sh").read_text(encoding="utf-8")
+        self.assertIn("kiosk-api-hold", build)
         self.assertIn("python3-gpiozero", build)
         self.assertIn("python3-lgpio", build)
         logs = self.client.get("/api/v1/logs").json()

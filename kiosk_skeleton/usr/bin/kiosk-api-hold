@@ -1,0 +1,21 @@
+#!/bin/bash
+# Keep something answering on 127.0.0.1:8765.
+#
+# tbw-root-api.service restarts itself, but once systemd has marked the unit
+# failed it will not start the process again. nginx then returns 502 for
+# GET /api/v1/machine/status and the kiosk stays on the error page.
+# This loop clears that failed state and starts the unit whenever the status
+# route is not a 200.
+set -u
+
+URL="${TBW_STATUS_URL:-http://127.0.0.1:8765/api/v1/machine/status}"
+
+while true; do
+	if curl -fsS --max-time 3 "${URL}" >/dev/null 2>&1; then
+		sleep 5
+		continue
+	fi
+	systemctl reset-failed tbw-root-api.service >/dev/null 2>&1 || true
+	systemctl start tbw-root-api.service >/dev/null 2>&1 || true
+	sleep 5
+done
