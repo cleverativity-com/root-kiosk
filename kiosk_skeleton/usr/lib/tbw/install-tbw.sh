@@ -65,8 +65,14 @@ write_ui_source() {
 	{
 		printf 'kiosk_ui=%s\n' "$1"
 		printf 'recorded_utc=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-		if [ -d "${SRC}/.git" ] && command -v git >/dev/null 2>&1; then
+		if [ -f "${SRC}/.kiosk-revision" ]; then
+			printf 'git_revision=%s\n' "$(tr -d '\r\n' < "${SRC}/.kiosk-revision")"
+		elif [ -d "${SRC}/.git" ] && command -v git >/dev/null 2>&1; then
 			printf 'git_revision=%s\n' "$(git -C "${SRC}" rev-parse HEAD)"
+		fi
+		if [ -f "${SRC}/.kiosk-subject" ]; then
+			printf 'git_subject=%s\n' "$(tr -d '\r\n' < "${SRC}/.kiosk-subject")"
+		elif [ -d "${SRC}/.git" ] && command -v git >/dev/null 2>&1; then
 			git -C "${SRC}" log -1 --format='git_subject=%s'
 		fi
 	} > /etc/tbw-root-api/kiosk-ui-source
@@ -116,8 +122,8 @@ if [ -d "${SRC}" ]; then
 		install_upstream_api
 	fi
 	if ! install_upstream_ui; then
-		echo "Upstream kiosk app has no dist/ build; downloading the published UI"
-		download_published_ui
+		echo "Upstream kiosk app has no dist/ build. Refusing the previously published UI." >&2
+		exit 1
 	fi
 	rm -rf "${SRC}"
 else
