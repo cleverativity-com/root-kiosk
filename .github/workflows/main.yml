@@ -19,7 +19,7 @@ jobs:
   raspberrypi:
     # Image builds that publish run on push. Skip the pull_request image job
     # on these branches so opening the PR does not start a release build.
-    if: github.event_name != 'pull_request' || (github.head_ref != 'cursor/kiosk-gpio-dotenv-256b' && github.head_ref != 'cursor/kiosk-api-stay-up-9028' && github.head_ref != 'cursor/kiosk-public-env-9028')
+    if: github.event_name != 'pull_request' || (github.head_ref != 'cursor/kiosk-gpio-dotenv-256b' && github.head_ref != 'cursor/kiosk-api-stay-up-9028' && github.head_ref != 'cursor/kiosk-public-env-9028' && github.head_ref != 'cursor/kiosk-app-keyboard-9028')
     runs-on: [ubuntu-24.04-arm]
 
     steps:

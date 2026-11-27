@@ -9,7 +9,7 @@ Defaults baked into `/boot/firmware`:
 - Hardware API: `tbw-root-api` on `127.0.0.1:8765`, reached by the UI through nginx at `/api/v1`
 - Settings API: `kiosk-settings` on `127.0.0.1:8766` (Wi-Fi, IPv4, and dispenser identity). Swagger at `http://127.0.0.1/settings/docs`
 - Splash screen: Root SNC logo (`splash.png`)
-- Keyboard layout: Italian (`it`). No on-screen keyboard. Chromium stays in kiosk fullscreen
+- Keyboard layout: Italian (`it`). The system Onboard keyboard is off. The name step keeps the app's own on-screen keyboard. Chromium stays in kiosk fullscreen
 - Screen never blanks
 - WiFi: `CleverWiFi` and `CleverWiFiX`
 - OpenVPN client (`openvpn.ovpn`); SSH (22) and VNC (5900) are firewalled so they are **only reachable from the VPN**
@@ -144,7 +144,7 @@ Whenever the heartbeat stops (for whatever reason), the device will first restar
 
 ## TBW kiosk app and API
 
-Chromium opens the TBW kiosk UI (`apps/tbw-root-kiosk-app`) from nginx on this machine. nginx serves that UI from `/var/www/html` and proxies `/api/` plus `/health` to the `tbw-root-api` systemd service, which listens on `127.0.0.1:8765` only. The unit restarts itself with no start-limit, and `kiosk-api-hold` starts it again if systemd has marked it failed, so `GET /api/v1/machine/status` does not stay a 502. The name step's on-screen keyboard is not shown.
+Chromium opens the TBW kiosk UI (`apps/tbw-root-kiosk-app`) from nginx on this machine. nginx serves that UI from `/var/www/html` and proxies `/api/` plus `/health` to the `tbw-root-api` systemd service, which listens on `127.0.0.1:8765` only. The unit restarts itself with no start-limit, and `kiosk-api-hold` starts it again if systemd has marked it failed, so `GET /api/v1/machine/status` does not stay a 502. The name step keeps the app's own on-screen keyboard. The system Onboard keyboard is not installed.
 
 The image build checks out [accleverate-v26](https://github.com/cleverativity-com/accleverate-v26) `main` with the Actions secret `ACCLEVERATE_READ_TOKEN` (read access to that repository), builds `tbw-root-kiosk-app`, and installs that build plus `services/tbw-root-api`. The release `version-info` records the git revision. Without the checkout, the image build stops instead of reusing the previously published UI. Before the Quasar build, `prepare-kiosk-app.py` writes that published bundle's public client variables into `.env.production` and puts the version label first in the status bar. The script prints the variable names only.
 

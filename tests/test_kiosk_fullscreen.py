@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Chromium stays in kiosk fullscreen and the on-screen keyboard is gone."""
+"""Chromium stays in kiosk fullscreen. The system keyboard stays off."""
 
 from __future__ import annotations
 
@@ -88,8 +88,9 @@ class KioskFullscreenTests(unittest.TestCase):
         install = (
             ROOT / "kiosk_skeleton" / "usr" / "lib" / "tbw" / "install-tbw.sh"
         ).read_text(encoding="utf-8")
-        self.assertIn("kiosk-qwerty-keyboard", install)
-        self.assertIn("kiosk-os-keyboard.css", install)
+        self.assertNotIn("kiosk-qwerty-keyboard", install)
+        self.assertNotIn("kiosk-os-keyboard.css", install)
+        self.assertNotIn("kiosk-step-name__keyboard", install)
 
     def test_shell_scripts_parse(self) -> None:
         for script in (
