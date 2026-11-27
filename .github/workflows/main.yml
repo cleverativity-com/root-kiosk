@@ -17,9 +17,9 @@ concurrency:
 
 jobs:
   raspberrypi:
-    # This branch publishes the image from the push workflow. Skip the
-    # duplicate pull_request build so the release is not raced.
-    if: github.event_name != 'pull_request' || (github.head_ref != 'cursor/kiosk-gpio-dotenv-256b' && github.head_ref != 'cursor/kiosk-api-stay-up-9028')
+    # Image builds that publish run on push. Skip the pull_request image job
+    # on these branches so opening the PR does not start a release build.
+    if: github.event_name != 'pull_request' || (github.head_ref != 'cursor/kiosk-gpio-dotenv-256b' && github.head_ref != 'cursor/kiosk-api-stay-up-9028' && github.head_ref != 'cursor/kiosk-public-env-9028')
     runs-on: [ubuntu-24.04-arm]
 
     steps:
@@ -104,11 +104,9 @@ jobs:
           corepack enable
           corepack prepare pnpm@12.6.0 --activate
           pnpm install --frozen-lockfile
-          # Version label first in the status bar. Tenant id is the one already
-          # baked into the published kiosk UI that earlier images downloaded.
-          # Copied, not printed: Vite inlines it from the repo-root .env.production.
+          # Version label first. Public client variables are written to
+          # .env.production from the published bundle. The script prints names only.
           python3 "${GITHUB_WORKSPACE}/kiosk_skeleton/usr/lib/tbw/prepare-kiosk-app.py" .
-          cp "${GITHUB_WORKSPACE}/kiosk_skeleton/usr/lib/tbw/kiosk-build.env" .env.production
           pnpm --filter tbw-root-kiosk-app run build
           test -f apps/tbw-root-kiosk-app/dist/spa/index.html
           rev="$(tr -d "\r\n" < .kiosk-revision)"

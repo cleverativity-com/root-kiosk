@@ -187,22 +187,8 @@ class TbwRootApiTests(unittest.TestCase):
         workflow = (ROOT / ".github" / "workflows" / "main.yml").read_text(encoding="utf-8")
         self.assertIn("pnpm --filter tbw-root-kiosk-app run build", workflow)
         self.assertIn("prepare-kiosk-app.py", workflow)
-        self.assertIn("kiosk-build.env", workflow)
-        env = (ROOT / "kiosk_skeleton" / "usr" / "lib" / "tbw" / "kiosk-build.env").read_text(
-            encoding="utf-8"
-        )
-        tenant_lines = [
-            line.split("=", 1)[1]
-            for line in env.splitlines()
-            if line.startswith("VITE_TBW_KIOSK_TENANT_ID=")
-        ]
-        self.assertEqual(len(tenant_lines), 1)
-        self.assertRegex(
-            tenant_lines[0],
-            r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
-        )
-        self.assertNotIn("your-tenant-uuid", env)
-        self.assertIn("VITE_TBW_LOCAL_API_BASE_URL=/api/v1", env)
+        self.assertNotIn("kiosk-build.env", workflow)
+        self.assertIn("cursor/kiosk-public-env-9028", workflow)
         self.assertIn("pngquant-bin: false", workflow)
         self.assertIn("libpng-dev", workflow)
         self.assertIn("ACCLEVERATE_READ_TOKEN is unset.", workflow)
@@ -245,6 +231,52 @@ class TbwRootApiTests(unittest.TestCase):
         self.assertLess(version_at, updated.index("kiosk-status-bar__locale"))
         self.assertLess(version_at, updated.index("kiosk-status-bar__settings"))
         self.assertEqual(updated.count("kiosk-status-bar__version"), 1)
+
+    def test_published_env_writes_every_public_name_and_refuses_a_gap(self) -> None:
+        import importlib.util
+        import tempfile
+
+        script = ROOT / "kiosk_skeleton" / "usr" / "lib" / "tbw" / "prepare-kiosk-app.py"
+        spec = importlib.util.spec_from_file_location("prepare_kiosk_app", script)
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        source = (
+            "let t={BASE_URL:`/`,DEV:!1,MODE:`production`,PROD:!0,SSR:!1,"
+            "VITE_SUPABASE_URL:`https://example.invalid`,"
+            "VITE_SUPABASE_PUBLISHABLE_KEY:`publishable`,"
+            "VITE_TBW_KIOSK_TENANT_ID:`11111111-1111-1111-1111-111111111111`,"
+            "VITE_TBW_LOCAL_API_BASE_URL:`/api/v1`,"
+            "VITE_BLANK:``,"
+            "VITE_GA_MEASUREMENT_ID:`G-TEST`}"
+        )
+        values = module.parse_published_env(source)
+        self.assertEqual(
+            module.missing_required(values),
+            [],
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            names = module.write_production_env(Path(tmp), values)
+            written = (Path(tmp) / ".env.production").read_text(encoding="utf-8")
+        self.assertEqual(
+            names,
+            [
+                "VITE_GA_MEASUREMENT_ID",
+                "VITE_SUPABASE_PUBLISHABLE_KEY",
+                "VITE_SUPABASE_URL",
+                "VITE_TBW_KIOSK_TENANT_ID",
+                "VITE_TBW_LOCAL_API_BASE_URL",
+            ],
+        )
+        self.assertNotIn("VITE_BLANK", written)
+        for name in names:
+            self.assertIn(f'{name}="', written)
+        incomplete = dict(values)
+        del incomplete["VITE_SUPABASE_URL"]
+        with self.assertRaises(SystemExit) as raised:
+            module.public_client_assignments(incomplete)
+        self.assertIn("VITE_SUPABASE_URL", str(raised.exception))
+        self.assertNotIn("11111111", str(raised.exception))
 
 
 class DosePulseTests(unittest.TestCase):
