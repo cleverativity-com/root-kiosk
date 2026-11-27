@@ -186,6 +186,8 @@ class TbwRootApiTests(unittest.TestCase):
         self.assertIn("Refusing the previously published UI.", install)
         workflow = (ROOT / ".github" / "workflows" / "main.yml").read_text(encoding="utf-8")
         self.assertIn("pnpm --filter tbw-root-kiosk-app run build", workflow)
+        self.assertIn("pngquant-bin: false", workflow)
+        self.assertIn("libpng-dev", workflow)
         self.assertIn("ACCLEVERATE_READ_TOKEN is unset.", workflow)
         self.assertIn("http.https://github.com/.extraheader", workflow)
         self.assertIn("AUTHORIZATION: basic", workflow)

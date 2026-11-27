@@ -94,6 +94,13 @@ jobs:
           # Root postinstall links an unrelated package. Drop it so this install
           # only prepares the kiosk app. Dependency build scripts still run.
           node -e 'const fs=require("fs"); const p=JSON.parse(fs.readFileSync("package.json","utf8")); delete p.scripts.postinstall; delete p.scripts.prepare; fs.writeFileSync("package.json", JSON.stringify(p, null, 2)+"\n");'
+          # pngquant-bin ships an x86 binary. On this arm64 runner its postinstall
+          # then tries to compile and fails without libpng. The kiosk image does
+          # not optimize PNGs with pngquant, so do not build it. libpng-dev is
+          # installed in case another package still compiles against libpng.
+          node -e 'const fs=require("fs"); const p="pnpm-workspace.yaml"; let t=fs.readFileSync(p,"utf8"); if (!/pngquant-bin:\s*true/.test(t)) { console.error("pngquant-bin allowBuilds entry was not true"); process.exit(1); } fs.writeFileSync(p, t.replace(/pngquant-bin:\s*true/, "pngquant-bin: false"));'
+          sudo apt-get update -qq
+          sudo apt-get install -yqq libpng-dev
           corepack enable
           corepack prepare pnpm@12.6.0 --activate
           pnpm install --frozen-lockfile
