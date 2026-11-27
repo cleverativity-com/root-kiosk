@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Prepare the checked-out kiosk app before its production build.
 
-Moves the status-bar version label ahead of the other controls, then writes
-the published kiosk bundle's public client variables to `.env.production`.
-Stdout lists variable names only.
+Moves the status-bar version label ahead of the other controls, adds the
+app keyboard to the staff login page, then writes the published kiosk
+bundle's public client variables to `.env.production`. Stdout lists
+variable names only.
 """
 
 from __future__ import annotations
@@ -172,6 +173,98 @@ def write_production_env(root: Path, values: dict[str, str]) -> list[str]:
     return [name for name, _value in assignments]
 
 
+_LOGIN_FIELDS = """      <PulseTextField
+        v-model="email"
+        :label="t('login.email')"
+        type="email"
+        :input-props="{ autofocus: true, autocomplete: 'username' }"
+      />
+      <PulseTextField
+        v-model="password"
+        :label="t('login.password')"
+        type="password"
+        :input-props="{ autocomplete: 'current-password' }"
+      />"""
+
+_LOGIN_FIELDS_WITH_KEYBOARD = """      <div @focusin="activeCredentialField = 'email'">
+        <PulseTextField
+          v-model="email"
+          :label="t('login.email')"
+          type="email"
+          :input-props="{ autofocus: true, autocomplete: 'username' }"
+        />
+      </div>
+      <div @focusin="activeCredentialField = 'password'">
+        <PulseTextField
+          v-model="password"
+          :label="t('login.password')"
+          type="password"
+          :input-props="{ autocomplete: 'current-password' }"
+        />
+      </div>
+      <KioskQwertyKeyboard
+        v-model="credentialValue"
+        variant="credentials"
+        class="kiosk-login-keyboard"
+      />"""
+
+_LOGIN_IMPORT = "import { TBW_KIOSK_HOME_PATH } from 'src/config/tbwKiosk';"
+_LOGIN_IMPORT_WITH_KEYBOARD = (
+    _LOGIN_IMPORT
+    + "\nimport KioskQwertyKeyboard from 'src/components/kiosk/KioskQwertyKeyboard.vue';"
+)
+
+_LOGIN_STATE = "const oauthLoading = ref<'google' | 'azure' | null>(null);"
+_LOGIN_STATE_WITH_KEYBOARD = """const oauthLoading = ref<'google' | 'azure' | null>(null);
+type CredentialField = 'email' | 'password';
+const activeCredentialField = ref<CredentialField>('email');
+const credentialValue = computed({
+  get(): string {
+    return activeCredentialField.value === 'email' ? email.value : password.value;
+  },
+  set(value: string): void {
+    if (activeCredentialField.value === 'email') {
+      email.value = value;
+    } else {
+      password.value = value;
+    }
+  },
+});"""
+
+_LOGIN_STYLE = """
+<style scoped>
+.kiosk-login-keyboard {
+  --kiosk-surface-lowest: #fff;
+  --kiosk-on-surface: #1c1c1c;
+  --kiosk-primary: #7f9b58;
+  --kiosk-key-font: 1rem;
+  margin-top: 0.75rem;
+  width: 100%;
+}
+</style>
+"""
+
+
+def add_login_keyboard(text: str) -> str:
+    """Show the app credentials keyboard on the staff login page."""
+    if "kiosk-login-keyboard" in text:
+        return text
+    if text.count(_LOGIN_FIELDS) != 1:
+        raise SystemExit("staff login page has no email and password fields")
+    if text.count(_LOGIN_IMPORT) != 1 or text.count(_LOGIN_STATE) != 1:
+        raise SystemExit("staff login page script anchors were not found")
+    updated = text.replace(_LOGIN_FIELDS, _LOGIN_FIELDS_WITH_KEYBOARD, 1)
+    updated = updated.replace(_LOGIN_IMPORT, _LOGIN_IMPORT_WITH_KEYBOARD, 1)
+    updated = updated.replace(_LOGIN_STATE, _LOGIN_STATE_WITH_KEYBOARD, 1)
+    if "</script>" not in updated:
+        raise SystemExit("staff login page has no script block")
+    if "kiosk-login-keyboard {" not in updated:
+        updated = updated.replace("</script>", "</script>\n" + _LOGIN_STYLE, 1)
+    if updated.count('variant="credentials"') != 1:
+        raise SystemExit("staff login keyboard was not added")
+    return updated
+
+
 def main() -> None:
     root = Path(sys.argv[1] if len(sys.argv) > 1 else ".")
     vue = root / "apps/tbw-root-kiosk-app/src/components/kiosk/KioskStatusBar.vue"
@@ -179,6 +272,9 @@ def main() -> None:
     if updated.index(VERSION_SPAN) > updated.index("onChangeDispenser"):
         raise SystemExit("version label is still after Change dispenser")
     vue.write_text(updated, encoding="utf-8")
+    login = root / "apps/tbw-root-kiosk-app/src/pages/LoginPage.vue"
+    login.write_text(add_login_keyboard(login.read_text(encoding="utf-8")), encoding="utf-8")
+    print("staff login keyboard: app credentials keyboard")
     names = write_production_env(root, load_published_env())
     print("public client env: " + ", ".join(names))
 

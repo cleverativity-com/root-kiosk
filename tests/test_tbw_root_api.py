@@ -278,6 +278,43 @@ class TbwRootApiTests(unittest.TestCase):
         self.assertIn("VITE_SUPABASE_URL", str(raised.exception))
         self.assertNotIn("11111111", str(raised.exception))
 
+    def test_staff_login_gets_the_app_credentials_keyboard(self) -> None:
+        import importlib.util
+
+        script = ROOT / "kiosk_skeleton" / "usr" / "lib" / "tbw" / "prepare-kiosk-app.py"
+        spec = importlib.util.spec_from_file_location("prepare_kiosk_app_login", script)
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        source = """<template>
+      <PulseTextField
+        v-model="email"
+        :label="t('login.email')"
+        type="email"
+        :input-props="{ autofocus: true, autocomplete: 'username' }"
+      />
+      <PulseTextField
+        v-model="password"
+        :label="t('login.password')"
+        type="password"
+        :input-props="{ autocomplete: 'current-password' }"
+      />
+</template>
+<script setup lang="ts">
+import { TBW_KIOSK_HOME_PATH } from 'src/config/tbwKiosk';
+const oauthLoading = ref<'google' | 'azure' | null>(null);
+</script>
+"""
+        updated = module.add_login_keyboard(source)
+        self.assertEqual(updated.count('variant="credentials"'), 1)
+        self.assertLess(updated.index('type="email"'), updated.index('variant="credentials"'))
+        self.assertLess(updated.index('type="password"'), updated.index('variant="credentials"'))
+        self.assertIn("KioskQwertyKeyboard", updated)
+        self.assertEqual(module.add_login_keyboard(updated).count('variant="credentials"'), 1)
+        with self.assertRaises(SystemExit) as raised:
+            module.add_login_keyboard("<template></template>")
+        self.assertIn("staff login page", str(raised.exception))
+
 
 class DosePulseTests(unittest.TestCase):
     def test_run_dose_pulses_each_step_then_releases_pins(self) -> None:
