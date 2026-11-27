@@ -104,6 +104,11 @@ jobs:
           corepack enable
           corepack prepare pnpm@12.6.0 --activate
           pnpm install --frozen-lockfile
+          # Version label first in the status bar. Tenant id is the one already
+          # baked into the published kiosk UI that earlier images downloaded.
+          # Copied, not printed: Vite inlines it from the repo-root .env.production.
+          python3 "${GITHUB_WORKSPACE}/kiosk_skeleton/usr/lib/tbw/prepare-kiosk-app.py" .
+          cp "${GITHUB_WORKSPACE}/kiosk_skeleton/usr/lib/tbw/kiosk-build.env" .env.production
           pnpm --filter tbw-root-kiosk-app run build
           test -f apps/tbw-root-kiosk-app/dist/spa/index.html
           rev="$(tr -d "\r\n" < .kiosk-revision)"
