@@ -186,6 +186,23 @@ class TbwRootApiTests(unittest.TestCase):
         self.assertIn("Refusing the previously published UI.", install)
         workflow = (ROOT / ".github" / "workflows" / "main.yml").read_text(encoding="utf-8")
         self.assertIn("pnpm --filter tbw-root-kiosk-app run build", workflow)
+        self.assertIn("prepare-kiosk-app.py", workflow)
+        self.assertIn("kiosk-build.env", workflow)
+        env = (ROOT / "kiosk_skeleton" / "usr" / "lib" / "tbw" / "kiosk-build.env").read_text(
+            encoding="utf-8"
+        )
+        tenant_lines = [
+            line.split("=", 1)[1]
+            for line in env.splitlines()
+            if line.startswith("VITE_TBW_KIOSK_TENANT_ID=")
+        ]
+        self.assertEqual(len(tenant_lines), 1)
+        self.assertRegex(
+            tenant_lines[0],
+            r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+        )
+        self.assertNotIn("your-tenant-uuid", env)
+        self.assertIn("VITE_TBW_LOCAL_API_BASE_URL=/api/v1", env)
         self.assertIn("pngquant-bin: false", workflow)
         self.assertIn("libpng-dev", workflow)
         self.assertIn("ACCLEVERATE_READ_TOKEN is unset.", workflow)
@@ -199,6 +216,35 @@ class TbwRootApiTests(unittest.TestCase):
         self.assertIn("python3-lgpio", build)
         logs = self.client.get("/api/v1/logs").json()
         self.assertEqual(logs["hardwareMode"], "sim")
+
+    def test_status_bar_version_moves_before_the_other_controls(self) -> None:
+        import importlib.util
+
+        script = ROOT / "kiosk_skeleton" / "usr" / "lib" / "tbw" / "prepare-kiosk-app.py"
+        spec = importlib.util.spec_from_file_location("prepare_kiosk_app", script)
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        source = """
+    <div class="kiosk-status-bar__actions row items-center">
+      <button type="button" class="kiosk-status-bar__staff-btn" @click="onChangeDispenser">
+        {{ t('tbw.kiosk.changeDispenser') }}
+      </button>
+      <div class="kiosk-status-bar__locale" role="group">
+        <button type="button">IT</button>
+      </div>
+      <span class="kiosk-status-bar__version">{{ releaseLabel }}</span>
+
+      <button type="button" class="kiosk-status-bar__settings" @click="onSettings">
+      </button>
+    </div>
+"""
+        updated = module.move_version_first(source)
+        version_at = updated.index("kiosk-status-bar__version")
+        self.assertLess(version_at, updated.index("onChangeDispenser"))
+        self.assertLess(version_at, updated.index("kiosk-status-bar__locale"))
+        self.assertLess(version_at, updated.index("kiosk-status-bar__settings"))
+        self.assertEqual(updated.count("kiosk-status-bar__version"), 1)
 
 
 class DosePulseTests(unittest.TestCase):
