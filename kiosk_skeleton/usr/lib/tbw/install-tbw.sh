@@ -130,34 +130,8 @@ else
 	download_published_ui
 fi
 
-# The published UI draws its own QWERTY on the name step. That keyboard
-# covers the page. Chromium is already fullscreen, so hide the in-app keys
-# and stretch the document to the viewport.
-hide_onscreen_keyboard() {
-	local css="${WEB_ROOT}/kiosk-os-keyboard.css"
-	local index="${WEB_ROOT}/index.html"
-	cat > "${css}" <<'EOF'
-/* No on-screen keyboard. The name field stays; keys are not drawn. */
-.kiosk-qwerty-keyboard,
-.kiosk-step-name__keyboard {
-	display: none !important;
-}
-html,
-body,
-#q-app {
-	margin: 0;
-	width: 100%;
-	min-height: 100%;
-	min-height: 100dvh;
-	background: #fff8e8;
-}
-EOF
-	if [ -f "${index}" ] && ! grep -q 'kiosk-os-keyboard.css' "${index}"; then
-		sed -i 's#</head>#<link rel="stylesheet" href="/kiosk-os-keyboard.css"></head>#' "${index}"
-	fi
-}
-
-hide_onscreen_keyboard
+# The name step uses the app's own KioskQwertyKeyboard. Do not hide it.
+# The system Onboard keyboard stays uninstalled. Chromium stays fullscreen.
 
 # The kiosk .env is gpio even when the upstream package shipped sim.
 python3 /usr/lib/tbw/gpio_env.py --write /etc/tbw-root-api/.env
