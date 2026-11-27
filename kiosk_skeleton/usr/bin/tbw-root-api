@@ -1,5 +1,6 @@
 #!/bin/bash
 # Start the local TBW hardware API on localhost.
+# nginx answers GET /api/v1/machine/status with 502 when this process is not listening.
 set -euo pipefail
 
 export PYTHONDONTWRITEBYTECODE=1
@@ -20,15 +21,20 @@ done
 
 APP="${TBW_UVICORN_APP:-tbw_root_api.main:app}"
 HOST="${TBW_HOST:-127.0.0.1}"
-PORT="${TBW_PORT:-8765}"
+PORT="${TBW_PORT:-${TBW_ROOT_API_PORT:-8765}}"
 
-if [ -x /opt/tbw-root-api/venv/bin/python ]; then
+can_serve() {
+	"$1" -c 'import uvicorn, tbw_root_api' >/dev/null 2>&1
+}
+
+# Prefer the image venv when it can import uvicorn. Otherwise use the system
+# interpreter and the package copied to /opt/tbw-root-api. Exiting here is a
+# failure: systemd and kiosk-api-hold start this process again.
+if [ -x /opt/tbw-root-api/venv/bin/python ] && can_serve /opt/tbw-root-api/venv/bin/python; then
 	PY=/opt/tbw-root-api/venv/bin/python
-elif [ -d /opt/tbw-root-api/tbw_root_api ]; then
-	PY=/usr/bin/python3
-	export PYTHONPATH="/opt/tbw-root-api${PYTHONPATH:+:$PYTHONPATH}"
 else
 	PY=/usr/bin/python3
+	export PYTHONPATH="/opt/tbw-root-api${PYTHONPATH:+:$PYTHONPATH}"
 fi
 
 exec "${PY}" -m uvicorn "${APP}" --host "${HOST}" --port "${PORT}"

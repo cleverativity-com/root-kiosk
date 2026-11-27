@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - cursor/kiosk-gpio-dotenv-256b
+      - cursor/kiosk-api-stay-up-9028
   pull_request:
 
 permissions:
@@ -14,7 +15,7 @@ jobs:
   raspberrypi:
     # This branch publishes the image from the push workflow. Skip the
     # duplicate pull_request build so the release is not raced.
-    if: github.event_name != 'pull_request' || github.head_ref != 'cursor/kiosk-gpio-dotenv-256b'
+    if: github.event_name != 'pull_request' || (github.head_ref != 'cursor/kiosk-gpio-dotenv-256b' && github.head_ref != 'cursor/kiosk-api-stay-up-9028')
     runs-on: [ubuntu-24.04-arm]
 
     steps:
@@ -79,7 +80,7 @@ jobs:
 
       - name: Determine release metadata
         id: meta
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/cursor/kiosk-gpio-dotenv-256b')
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/cursor/kiosk-gpio-dotenv-256b' || github.ref == 'refs/heads/cursor/kiosk-api-stay-up-9028')
         run: |
           set -euo pipefail
           short_sha="$(git rev-parse --short=7 HEAD)"
@@ -93,7 +94,7 @@ jobs:
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/cursor/kiosk-gpio-dotenv-256b')
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/cursor/kiosk-gpio-dotenv-256b' || github.ref == 'refs/heads/cursor/kiosk-api-stay-up-9028')
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
           name: ${{ steps.meta.outputs.name }}

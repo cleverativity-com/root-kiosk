@@ -119,28 +119,40 @@ done
 # Real kiosk fullscreen for the life of the session. --kiosk hides the
 # browser chrome and will not leave fullscreen. Openbox maps the window
 # undecorated and fullscreen, with no keys or gestures that resize it.
-# kiosk-hold-fullscreen puts the window back over the whole display if a
-# mode change or a wake drops that state.
+# Ozone stays on X11 so that window manager can cover the panel; a Wayland
+# window leaves a strip of the desktop around the page. One
+# --disable-features flag is required: Chromium keeps only the last one.
+# VirtualKeyboard is in that list so focusing the name field does not open
+# Chromium's own keyboard. kiosk-hold-fullscreen puts the window back over
+# the whole display if a mode change or a wake drops that state.
 URL=$(get-ini /boot/firmware/kioskbrowser.ini browser url)
+CHROME_SIZE_FLAGS=""
+read -r DISP_W DISP_H <<EOF
+$(xdotool getdisplaygeometry 2>/dev/null || true)
+EOF
+if [ -n "${DISP_W}" ] && [ -n "${DISP_H}" ]; then
+	CHROME_SIZE_FLAGS="--window-position=0,0 --window-size=${DISP_W},${DISP_H}"
+fi
 chromium --start-fullscreen \
 		 --allow-insecure-localhost \
 		 --autoplay-policy=no-user-gesture-required \
 		 --check-for-update-interval=1 \
 		 --disable-component-update \
-		 --disable-features=Translate \
-		 --disable-features=TranslateUI \
+		 --disable-features=Translate,TranslateUI,VirtualKeyboard \
 		 --disable-infobars \
 		 --disable-pinch \
 		 --disable-session-crashed-bubble \
 		 --disable-smooth-scrolling \
 		 --kiosk \
 		 --noerrdialogs \
+		 --ozone-platform=x11 \
 		 --overscroll-history-navigation=0 \
 		 --simulate-critical-update \
 		 --simulate-outdated-no-au='Tue, 31 Dec 2099 23:59:59 GMT' \
 		 --touch-events=enabled \
 		 --process-per-site \
 		 --no-memcheck \
+		 ${CHROME_SIZE_FLAGS} \
 		 ${CHROME_DARK_MODE_FLAGS} \
 		 ${CHROME_GPU_FLAGS} \
 		 ${CHROME_LOW_END_FLAGS} \

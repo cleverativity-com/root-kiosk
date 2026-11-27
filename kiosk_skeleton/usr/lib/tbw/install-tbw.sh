@@ -54,7 +54,7 @@ install_upstream_api() {
 	printf 'TBW_UVICORN_APP=%s\n' "tbw_root_api.main:app" > /etc/tbw-root-api/app.env
 	# The venv does not see the system gpiozero package. The copy-only layout has no venv.
 	if [ -x /opt/tbw-root-api/venv/bin/pip ]; then
-		/opt/tbw-root-api/venv/bin/pip install --no-cache-dir gpiozero
+		/opt/tbw-root-api/venv/bin/pip install --no-cache-dir gpiozero uvicorn
 	fi
 	python3 /usr/lib/tbw/gpio_env.py --normalize-tree /opt/tbw-root-api
 	return 0
@@ -123,6 +123,35 @@ if [ -d "${SRC}" ]; then
 else
 	download_published_ui
 fi
+
+# The published UI draws its own QWERTY on the name step. That keyboard
+# covers the page. Chromium is already fullscreen, so hide the in-app keys
+# and stretch the document to the viewport.
+hide_onscreen_keyboard() {
+	local css="${WEB_ROOT}/kiosk-os-keyboard.css"
+	local index="${WEB_ROOT}/index.html"
+	cat > "${css}" <<'EOF'
+/* No on-screen keyboard. The name field stays; keys are not drawn. */
+.kiosk-qwerty-keyboard,
+.kiosk-step-name__keyboard {
+	display: none !important;
+}
+html,
+body,
+#q-app {
+	margin: 0;
+	width: 100%;
+	min-height: 100%;
+	min-height: 100dvh;
+	background: #fff8e8;
+}
+EOF
+	if [ -f "${index}" ] && ! grep -q 'kiosk-os-keyboard.css' "${index}"; then
+		sed -i 's#</head>#<link rel="stylesheet" href="/kiosk-os-keyboard.css"></head>#' "${index}"
+	fi
+}
+
+hide_onscreen_keyboard
 
 # The kiosk .env is gpio even when the upstream package shipped sim.
 python3 /usr/lib/tbw/gpio_env.py --write /etc/tbw-root-api/.env

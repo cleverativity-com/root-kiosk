@@ -13,7 +13,10 @@ if [ -z "${DISPLAY}" ]; then
 fi
 
 while true; do
-	WINS=$(xdotool search --onlyvisible --class '[Cc]hromium' 2>/dev/null || true)
+		WINS=$(
+			xdotool search --onlyvisible --class '[Cc]hromium' 2>/dev/null || true
+			xdotool search --onlyvisible --class 'chromium-browser' 2>/dev/null || true
+		)
 	for WIN in ${WINS}; do
 		read -r DISP_W DISP_H <<EOF
 $(xdotool getdisplaygeometry 2>/dev/null || true)

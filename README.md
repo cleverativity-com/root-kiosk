@@ -144,7 +144,7 @@ Whenever the heartbeat stops (for whatever reason), the device will first restar
 
 ## TBW kiosk app and API
 
-Chromium opens the TBW kiosk UI (`apps/tbw-root-kiosk-app`) from nginx on this machine. nginx serves that UI from `/var/www/html` and proxies `/api/` plus `/health` to the `tbw-root-api` systemd service, which listens on `127.0.0.1:8765` only.
+Chromium opens the TBW kiosk UI (`apps/tbw-root-kiosk-app`) from nginx on this machine. nginx serves that UI from `/var/www/html` and proxies `/api/` plus `/health` to the `tbw-root-api` systemd service, which listens on `127.0.0.1:8765` only. The unit restarts itself with no start-limit, and `kiosk-api-hold` starts it again if systemd has marked it failed, so `GET /api/v1/machine/status` does not stay a 502. The name step's on-screen keyboard is not shown.
 
 The image build downloads the published UI from `https://a26-tbw-root-kiosk-app-main.srvnve01.cleverativity.com/`. To install the copies from [accleverate-v26](https://github.com/cleverativity-com/accleverate-v26) instead, set the GitHub Actions secret `ACCLEVERATE_READ_TOKEN` (read access to that repository). The workflow sparse-checkouts `apps/tbw-root-kiosk-app` and `services/tbw-root-api` into `third_party/accleverate-v26`, and `build.sh` installs them. Image input: accleverate-v26 `main` at `030f92d09f0eca6441fef335b63c345ba069252e`.
 
